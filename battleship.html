@@ -1,0 +1,1362 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Battleship · DuelZone</title>
+  <meta name="description" content="Play Battleship on DuelZone — Tactical sonar grid naval combat vs Bot or Friend." />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="stylesheet" href="duelzone.css" />
+  <style>
+    .hidden { display: none !important; }
+
+    /* ── Battleship Setup ── */
+    .dz-setup-page .dz-setup-wrap {
+      display: flex; flex-direction: column; gap: 14px;
+      width: 100%; max-width: 400px; margin: 0 auto; padding: 16px;
+      font-family: 'Plus Jakarta Sans', sans-serif; color: var(--dz-text-primary);
+    }
+    .dz-hero-heading {
+      font-size: 28px; font-weight: 800;
+      background: var(--dz-gradient-text);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 2px;
+    }
+    .dz-section-title {
+      font-size: 11px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--dz-text-secondary);
+    }
+    .dz-mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .dz-mode-card {
+      background: var(--dz-bg-card); border: 2px solid var(--dz-border);
+      border-radius: var(--dz-radius-md); padding: 18px 12px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      cursor: pointer; transition: all var(--dz-transition); text-align: center;
+    }
+    .dz-mode-card:hover { border-color: var(--dz-border-light); transform: translateY(-2px); }
+    .dz-mode-card.selected { border-color: var(--dz-cyan); box-shadow: 0 0 12px rgba(0,229,255,0.15); }
+    .dz-mode-icon { font-size: 26px; }
+    .dz-mode-name { font-size: 14px; font-weight: 700; }
+    .dz-mode-desc { font-size: 10px; color: var(--dz-text-secondary); }
+
+    .dz-swatch-row { display: flex; gap: 12px; }
+    .dz-swatch {
+      flex: 1; padding: 10px; border-radius: var(--dz-radius-md);
+      background: var(--dz-bg-card); border: 2px solid var(--dz-border);
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: all var(--dz-transition);
+    }
+    .dz-swatch.selected { border-color: var(--dz-cyan); box-shadow: 0 0 10px rgba(0,229,255,0.15); }
+    .bs-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+
+    .dz-toggle-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-bottom: 8px; border-bottom: 1.5px solid var(--dz-border);
+    }
+    .dz-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .dz-toggle input { opacity: 0; width: 0; height: 0; }
+    .dz-toggle-track {
+      position: absolute; cursor: pointer; inset: 0;
+      background-color: var(--dz-border); transition: .3s; border-radius: 24px;
+    }
+    .dz-toggle-track:before {
+      position: absolute; content: ""; height: 16px; width: 16px;
+      left: 4px; bottom: 4px; background-color: white; transition: .3s; border-radius: 50%;
+    }
+    .dz-toggle input:checked + .dz-toggle-track { background-color: var(--dz-cyan); }
+    .dz-toggle input:checked + .dz-toggle-track:before { transform: translateX(20px); }
+
+    /* ── Battleship UI ── */
+    .bs-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      width: 100%; max-width: 420px; margin: 0 auto; padding: 8px; user-select: none;
+    }
+    .bs-status-bar {
+      display: flex; justify-content: space-between; align-items: center; width: 100%;
+      background: var(--dz-bg-card); border: 1px solid var(--dz-border);
+      padding: 10px 14px; border-radius: var(--dz-radius-md);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .bs-fleet-status {
+      display: flex; gap: 6px; font-size: 11px; font-weight: 700; color: var(--dz-text-secondary);
+    }
+    .bs-ship-badge {
+      background: rgba(255,255,255,0.05); border: 1px solid var(--dz-border);
+      padding: 2px 6px; border-radius: var(--dz-radius-sm); display: flex; align-items: center; gap: 4px;
+    }
+    .bs-ship-badge.sunk { text-decoration: line-through; opacity: 0.3; background: rgba(255,0,0,0.1); border-color: rgba(255,0,0,0.3); }
+
+    .bs-grid-container {
+      background: #090e17; border: 3px solid #1e293b; border-radius: 16px;
+      padding: 10px; width: 100%; position: relative; overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,229,255,0.05);
+    }
+    .bs-radar-sweep {
+      position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+      background: conic-gradient(from 0deg at 50% 50%, rgba(0, 229, 255, 0.1) 0deg, transparent 60deg, transparent 360deg);
+      animation: bsSweep 4s linear infinite; pointer-events: none; opacity: 0.5;
+    }
+    @keyframes bsSweep { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .bs-grid {
+      display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; width: 100%; position: relative; z-index: 2;
+    }
+    .bs-cell {
+      aspect-ratio: 1; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; position: relative; font-size: 12px;
+    }
+    .bs-cell:hover { background: rgba(0, 229, 255, 0.2); border-color: var(--dz-cyan); }
+    .bs-cell.hit { background: rgba(239, 68, 68, 0.3) !important; border-color: #ef4444 !important; }
+    .bs-cell.hit::after { content: '💥'; font-size: 14px; animation: bsPop 0.3s cubic-bezier(0.175,0.885,0.32,1.275); }
+    .bs-cell.miss { background: rgba(59, 130, 246, 0.2) !important; border-color: #3b82f6 !important; }
+    .bs-cell.miss::after { content: '•'; color: #60a5fa; font-size: 20px; line-height: 0; }
+    .bs-cell.ship { background: rgba(148, 163, 184, 0.3); border-color: #94a3b8; }
+    
+    @keyframes bsPop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+
+    .bs-msg-bar {
+      font-size: 13px; font-weight: 600; color: var(--dz-text-primary); text-align: center;
+      background: var(--dz-bg-card); padding: 8px 18px; border-radius: var(--dz-radius-pill);
+      border: 1px solid var(--dz-border); box-shadow: 0 2px 6px rgba(0,0,0,0.08); width: 100%;
+    }
+  </style>
+</head>
+<body>
+<div class="dz-app">
+  <header class="dz-topbar">
+    <a class="dz-icon-btn" id="dz-back-hub" href="index.html" aria-label="Back">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </a>
+    <span class="dz-logo" style="font-size:17px;">Battleship</span>
+    <div class="dz-topbar-actions">
+      <button class="dz-icon-btn" id="dz-restart" type="button" aria-label="Restart">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.08-5"/></svg>
+      </button>
+      <button class="dz-theme-toggle" id="themeToggle" type="button">
+        <svg id="iconMoon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg id="iconSun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Setup Screen -->
+  <div id="bs-setup">
+    <div class="dz-setup-page dz-setup-wrap">
+      <p class="dz-hero-eyebrow">Battleship</p>
+      <h2 class="dz-hero-heading">Naval Ops</h2>
+      <p style="color:var(--dz-text-secondary);font-size:13px;margin-bottom:12px;">Deploy radar grid & command your fleet</p>
+
+      <div class="dz-section-title">Match Mode</div>
+      <div class="dz-mode-grid">
+        <div class="dz-mode-card selected" data-mode="bot">
+          <span class="dz-mode-icon">🤖</span>
+          <span class="dz-mode-name">vs Bot AI</span>
+          <span class="dz-mode-desc">Single Player</span>
+        </div>
+        <div class="dz-mode-card" data-mode="friend">
+          <span class="dz-mode-icon">🤝</span>
+          <span class="dz-mode-name">vs Friend</span>
+          <span class="dz-mode-desc">Pass & Play</span>
+        </div>
+      </div>
+
+      <div class="dz-section-title" style="margin-top:16px;">Sonar Palette</div>
+      <div class="dz-swatch-row">
+        <div class="dz-swatch selected" data-theme="cyan">
+          <span class="bs-dot" style="background:#00e5ff"></span>
+          <span style="font-size:12px;font-weight:700">Cyber Cyan</span>
+        </div>
+        <div class="dz-swatch" data-theme="green">
+          <span class="bs-dot" style="background:#10b981"></span>
+          <span style="font-size:12px;font-weight:700">Tactical</span>
+        </div>
+        <div class="dz-swatch" data-theme="red">
+          <span class="bs-dot" style="background:#ef4444"></span>
+          <span style="font-size:12px;font-weight:700">Red Alert</span>
+        </div>
+      </div>
+
+      <div class="dz-section-title" style="margin-top:16px;">Settings</div>
+      <div class="dz-toggle-row">
+        <span style="font-size:14px;font-weight:600">Sonar Audio FX</span>
+        <label class="dz-toggle">
+          <input type="checkbox" checked id="bs-sound-toggle">
+          <span class="dz-toggle-track"></span><span class="dz-toggle-thumb"></span>
+        </label>
+      </div>
+
+      <button class="dz-btn dz-btn-primary" id="bs-start-btn" type="button"
+              style="margin-top:20px;width:100%;border-radius:var(--dz-radius-xl);font-size:14px;font-weight:700;">
+        ENGAGE RADAR
+      </button>
+    </div>
+  </div>
+
+  <!-- Play Screen -->
+  <div id="bs-play" class="hidden">
+    <div id="bs-game-area"></div>
+  </div>
+</div>
+
+<div id="dz-result-overlay">
+  <div class="dz-result-page" style="max-width:320px;">
+    <div class="dz-result-trophy">🚢</div>
+    <h2 class="dz-result-heading" id="dz-result-title">Victory!</h2>
+    <p class="dz-result-subtitle" id="dz-result-sub"></p>
+    <div class="dz-result-actions">
+      <button class="dz-btn dz-btn-primary" id="dz-result-again" type="button">PLAY AGAIN</button>
+      <button class="dz-btn dz-btn-secondary" id="dz-result-share" type="button">SHARE</button>
+    </div>
+    <a class="dz-see-all" href="index.html" style="margin-top:8px;display:block;">← Back to Hub</a>
+  </div>
+</div>
+
+<script>
+/* DuelZone — game registry. Every game must be registered or findGame() returns null. */
+(function (global) {
+  'use strict';
+
+
+  var GAMES = [
+    { id: 'chess', title: 'Chess', icon: '♟️', desc: 'Outsmart your rival', category: 'strategy', modes: 'pvp+bot', status: 'live', href: 'chess.html', plays: '14.2k', badge: 'hot' },
+    { id: 'ludo', title: 'Ludo', icon: '🎲', desc: 'Roll. Race. Win.', category: 'board', modes: 'pvp', status: 'live', href: 'ludo.html', plays: '9.8k', badge: 'new' },
+    { id: 'tetris', title: 'Tetris', icon: '🟦', desc: 'Stack to survive', category: 'arcade', modes: 'solo', status: 'live', href: 'tetris.html', plays: '6.4k' },
+    { id: 'battleship', title: 'Battleship', icon: '🚢', desc: 'Sink or be sunk', category: 'strategy', modes: 'pvp+bot', status: 'live', href: 'battleship.html', plays: '5.2k' },
+    { id: 'checkers', title: 'Checkers', icon: '⬛', desc: 'Jump and crown', category: 'strategy', modes: 'pvp+bot', status: 'live', href: 'checkers.html', plays: '4.8k' },
+    { id: 'carrom', title: 'Carrom', icon: '🎯', desc: 'Flick. Pocket. Score.', category: 'board', modes: 'pvp', status: 'soon', href: null, plays: 'Coming soon', badge: 'soon' },
+    { id: 'sudoku', title: 'Sudoku', icon: '🔢', desc: 'Fill the grid', category: 'puzzle', modes: 'solo', status: 'live', href: 'sudoku.html', plays: '4.1k' },
+    { id: 'minesweeper', title: 'Minesweeper', icon: '💣', desc: 'One wrong move...', category: 'puzzle', modes: 'solo', status: 'live', href: 'minesweeper.html', plays: '3.1k', badge: 'new' },
+    { id: 'airhockey', title: 'Air Hockey', icon: '🏒', desc: 'Slide and score', category: 'arcade', modes: 'pvp', status: 'live', href: 'airhockey.html', plays: '2.9k' },
+    { id: 'tanks', title: 'Tanks Arena', icon: '🛡️', desc: 'Blast your rival', category: 'arcade', modes: 'pvp', status: 'live', href: 'tanks.html', plays: '2.7k' },
+    { id: 'bomberman', title: 'Bomberman', icon: '💥', desc: 'Bomb battle', category: 'arcade', modes: 'pvp', status: 'live', href: 'bomberman.html', plays: '2.5k' },
+    { id: 'starcatcher', title: 'Star Catcher', icon: '⭐', desc: 'Catch falling stars', category: 'arcade', modes: 'solo', status: 'live', href: 'starcatcher.html', plays: '2.3k' },
+    { id: 'spacedodge', title: 'Space Dodge', icon: '🚀', desc: 'Dodge asteroids', category: 'arcade', modes: 'solo', status: 'live', href: 'spacedodge.html', plays: '2.1k' },
+    { id: 'territory', title: 'Territory', icon: '🗺️', desc: 'Claim the map', category: 'strategy', modes: 'pvp', status: 'live', href: 'territory.html', plays: '2.0k' },
+    { id: 'pingpong', title: 'Ping Pong', icon: '🏓', desc: 'Classic paddle duel', category: 'arcade', modes: 'pvp', status: 'live', href: 'pingpong.html', plays: '1.9k' },
+    { id: 'darts', title: 'Darts', icon: '🎯', desc: 'Hit the bullseye', category: 'arcade', modes: 'solo+pvp', status: 'live', href: 'darts.html', plays: '1.8k' },
+    { id: 'reaction', title: 'Reaction Test', icon: '⚡', desc: 'Tap when it turns green', category: 'casual', modes: 'solo', status: 'live', href: 'reaction.html', plays: '1.7k' },
+    { id: 'snake', title: 'Snake Duel', icon: '🐍', desc: 'Grow or crash', category: 'arcade', modes: 'pvp', status: 'live', href: 'snake.html', plays: '1.6k' },
+    { id: 'connect4', title: 'Connect Four', icon: '🔴', desc: 'Four in a row', category: 'board', modes: 'pvp', status: 'live', href: 'connect4.html', plays: '1.5k' },
+    { id: 'wordduel', title: 'Word Duel', icon: '📝', desc: 'Race to type', category: 'casual', modes: 'pvp', status: 'live', href: 'wordduel.html', plays: '1.4k' },
+    { id: 'pool', title: '8-Ball Pool', icon: '🎱', desc: 'Sink the eight', category: 'arcade', modes: 'pvp', status: 'live', href: 'pool.html', plays: '1.3k' },
+    { id: 'blackjack', title: 'Blackjack', icon: '🃏', desc: 'Beat the dealer', category: 'card', modes: 'solo', status: 'live', href: 'blackjack.html', plays: '1.2k' },
+    { id: 'memory', title: 'Memory Match', icon: '🧠', desc: 'Flip and remember', category: 'puzzle', modes: 'solo', status: 'live', href: 'memory.html', plays: '1.1k' },
+    { id: '2048', title: '2048 Duel', icon: '🔲', desc: 'Merge to win', category: 'puzzle', modes: 'pvp', status: 'live', href: 'game2048.html', plays: '1.0k' },
+    { id: 'pong', title: 'Pong Classic', icon: '🕹️', desc: 'Retro paddle war', category: 'arcade', modes: 'pvp', status: 'live', href: 'pong.html', plays: '980' }
+  ];
+
+  var FILTER_MAP = {
+    All: null,
+    Strategy: ['strategy'],
+    Board: ['board'],
+    Arcade: ['arcade'],
+    Puzzle: ['puzzle'],
+    Card: ['card'],
+    Casual: ['casual']
+  };
+
+  function findGame(id) {
+    if (!id) return null;
+    var key = String(id).toLowerCase();
+    for (var i = 0; i < GAMES.length; i++) {
+      if (GAMES[i].id === key) return GAMES[i];
+    }
+    return null;
+  }
+
+  function liveGames() {
+    return GAMES.filter(function (g) { return g.status === 'live'; });
+  }
+
+  function topRated() {
+    return liveGames().slice().sort(function (a, b) {
+      var pa = parseFloat(String(a.plays).replace(/[^\d.]/g, '')) || 0;
+      var pb = parseFloat(String(b.plays).replace(/[^\d.]/g, '')) || 0;
+      return pb - pa;
+    });
+  }
+
+  global.DZ_GAMES = GAMES;
+  global.DZ_FILTER_MAP = FILTER_MAP;
+  global.findGame = findGame;
+  global.dzLiveGames = liveGames;
+  global.dzTopRated = topRated;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* DuelZone — theme persistence via localStorage */
+(function (global) {
+  'use strict';
+
+  var STORAGE_KEY = 'dz-theme';
+
+  function getTheme() {
+    try {
+      return localStorage.getItem(STORAGE_KEY) || 'dark';
+    } catch (e) {
+      return 'dark';
+    }
+  }
+
+  function setTheme(theme) {
+    var t = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    try {
+      localStorage.setItem(STORAGE_KEY, t);
+    } catch (e) { /* private browsing */ }
+    syncToggleIcons(t);
+    return t;
+  }
+
+  function syncToggleIcons(theme) {
+    var moon = document.getElementById('iconMoon');
+    var sun = document.getElementById('iconSun');
+    if (!moon || !sun) return;
+    var isLight = theme === 'light';
+    moon.style.display = isLight ? 'block' : 'none';
+    sun.style.display = isLight ? 'none' : 'block';
+  }
+
+  function toggleTheme() {
+    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+    return setTheme(current === 'light' ? 'dark' : 'light');
+  }
+
+  function bindThemeToggle(btnId) {
+    var btn = document.getElementById(btnId || 'themeToggle');
+    if (!btn || btn._dzThemeWired) return;
+    btn._dzThemeWired = true;
+    btn.addEventListener('click', toggleTheme);
+  }
+
+  setTheme(getTheme());
+
+  global.dzGetTheme = getTheme;
+  global.dzSetTheme = setTheme;
+  global.dzToggleTheme = toggleTheme;
+  global.dzBindThemeToggle = bindThemeToggle;
+  global.dzSyncThemeIcons = function () { syncToggleIcons(getTheme()); };
+
+  document.addEventListener('DOMContentLoaded', function () {
+    syncToggleIcons(getTheme());
+    bindThemeToggle('themeToggle');
+  });
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* DuelZone — Core Logic, Player Profile, and Global Audio */
+(function (global) {
+  'use strict';
+
+  // --- GAME LIFECYCLE ---
+  var gameLoops = [];
+  function registerGameLoop(fn) { gameLoops.push(fn); }
+  function unregisterGameLoop(fn) { gameLoops = gameLoops.filter(function (f) { return f !== fn; }); }
+  function stopAllGames() {
+    gameLoops.forEach(function (fn) { try { fn(); } catch (e) {} });
+    gameLoops = [];
+  }
+
+  // --- PLAYER PROFILE & XP SYSTEM ---
+  var DZPlayer = {
+    data: {
+      name: "Player",
+      avatar: "👽",
+      xp: 0,
+      level: 1,
+      matches: 0,
+      wins: 0,
+      prefs: { music: false, sfx: true }
+    },
+    load: function() {
+      try {
+        var d = localStorage.getItem('dz_player_v1');
+        if (d) {
+          var parsed = JSON.parse(d);
+          for (var k in parsed) {
+            if (parsed.hasOwnProperty(k)) this.data[k] = parsed[k];
+          }
+        }
+      } catch(e) {}
+      this.recalcLevel();
+    },
+    save: function() {
+      try { localStorage.setItem('dz_player_v1', JSON.stringify(this.data)); } catch(e) {}
+    },
+    recalcLevel: function() {
+      this.data.level = Math.floor(Math.pow(this.data.xp / 100, 0.5)) + 1;
+    },
+    addXP: function(amount) {
+      var oldLevel = this.data.level;
+      this.data.xp += amount;
+      this.recalcLevel();
+      this.save();
+      if (this.data.level > oldLevel) {
+        if (typeof DZAudio !== 'undefined') DZAudio.playSFX('levelup');
+        if (typeof dzFireConfetti === 'function') dzFireConfetti();
+      }
+    },
+    addMatch: function(won) {
+      this.data.matches++;
+      if (won) this.data.wins++;
+      this.save();
+    },
+    setName: function(newName) {
+      if (newName && newName.trim().length > 0) {
+        this.data.name = newName.trim().substring(0, 15); // limit length
+        this.save();
+      }
+    },
+    xpForNextLevel: function() {
+      return Math.pow(this.data.level, 2) * 100;
+    },
+    xpForCurrentLevel: function() {
+      return Math.pow(this.data.level - 1, 2) * 100;
+    },
+    getProgressPercent: function() {
+      var currentFloor = this.xpForCurrentLevel();
+      var nextCeil = this.xpForNextLevel();
+      var range = nextCeil - currentFloor;
+      var into = this.data.xp - currentFloor;
+      return Math.min(100, Math.max(0, (into / range) * 100));
+    }
+  };
+  DZPlayer.load();
+
+  // --- GLOBAL AUDIO GENERATOR ---
+  var DZAudio = {
+    ctx: null,
+    bgmNodes: [],
+    initialized: false,
+    init: function() {
+      if (this.initialized) return;
+      if (!this.ctx) {
+        var AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) this.ctx = new AudioContext();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+      this.initialized = true;
+      if (DZPlayer.data.prefs.music) this.playBGM();
+    },
+    playBGM: function() {
+      this.stopBGM();
+      if (!DZPlayer.data.prefs.music || !this.ctx) return;
+      var t = this.ctx.currentTime;
+      
+      var osc1 = this.ctx.createOscillator();
+      var gain1 = this.ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.value = 110.00;
+      gain1.gain.setValueAtTime(0, t);
+      gain1.gain.linearRampToValueAtTime(0.04, t + 4);
+      osc1.connect(gain1); gain1.connect(this.ctx.destination);
+      osc1.start(t);
+      this.bgmNodes.push({o: osc1, g: gain1});
+      
+      var osc2 = this.ctx.createOscillator();
+      var gain2 = this.ctx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.value = 164.81;
+      gain2.gain.setValueAtTime(0, t);
+      gain2.gain.linearRampToValueAtTime(0.02, t + 6);
+      osc2.connect(gain2); gain2.connect(this.ctx.destination);
+      osc2.start(t);
+      this.bgmNodes.push({o: osc2, g: gain2});
+    },
+    stopBGM: function() {
+      var t = this.ctx ? this.ctx.currentTime : 0;
+      this.bgmNodes.forEach(function(n) {
+        try {
+          n.g.gain.linearRampToValueAtTime(0, t + 1);
+          setTimeout(function() { try { n.o.stop(); } catch(e){} }, 1100);
+        } catch(e) {}
+      });
+      this.bgmNodes = [];
+    },
+    toggleMusic: function(on) {
+      DZPlayer.data.prefs.music = on;
+      DZPlayer.save();
+      if (on) {
+        if (!this.initialized) this.init();
+        else this.playBGM();
+      } else {
+        this.stopBGM();
+      }
+    },
+    toggleSFX: function(on) {
+      DZPlayer.data.prefs.sfx = on;
+      DZPlayer.save();
+    },
+    isSFXEnabled: function() {
+      return DZPlayer.data.prefs.sfx;
+    },
+    playSFX: function(type) {
+      if (!this.isSFXEnabled() || !this.ctx) return;
+      var t = this.ctx.currentTime;
+      var osc = this.ctx.createOscillator();
+      var gain = this.ctx.createGain();
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      if (type === 'click') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, t);
+        osc.frequency.exponentialRampToValueAtTime(400, t + 0.05);
+        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+        osc.start(t);
+        osc.stop(t + 0.05);
+      } else if (type === 'win') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(400, t);
+        osc.frequency.setValueAtTime(500, t + 0.1);
+        osc.frequency.setValueAtTime(600, t + 0.2);
+        osc.frequency.setValueAtTime(800, t + 0.3);
+        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.linearRampToValueAtTime(0, t + 0.5);
+        osc.start(t);
+        osc.stop(t + 0.5);
+      } else if (type === 'levelup') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, t);
+        osc.frequency.setValueAtTime(554.37, t + 0.15); // C#
+        osc.frequency.setValueAtTime(659.25, t + 0.3); // E
+        osc.frequency.setValueAtTime(880, t + 0.45); // A
+        gain.gain.setValueAtTime(0.15, t);
+        gain.gain.linearRampToValueAtTime(0, t + 0.8);
+        osc.start(t);
+        osc.stop(t + 0.8);
+      }
+    }
+  };
+
+  document.addEventListener('click', function _initAudio(e) {
+    if (DZPlayer.data.prefs.music) DZAudio.init();
+    document.removeEventListener('click', _initAudio);
+  }, { once: true });
+
+  // Play SFX on button clicks
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('button') || e.target.closest('.dz-btn') || e.target.closest('.dz-icon-btn') || e.target.closest('.dz-mode-card') || e.target.closest('.dz-swatch')) {
+      if (typeof DZAudio !== 'undefined') DZAudio.playSFX('click');
+    }
+  });
+
+  global.dzRegisterGameLoop = registerGameLoop;
+  global.dzUnregisterGameLoop = unregisterGameLoop;
+  global.dzStopAllGames = stopAllGames;
+  global.DZPlayer = DZPlayer;
+  global.DZAudio = DZAudio;
+
+  // --- GLOBAL CONFETTI VFX ---
+  global.dzFireConfetti = function() {
+    var count = 100;
+    var colors = ['#00e5ff', '#ff007f', '#ffd700', '#10b981', '#a855f7'];
+    var particles = [];
+    var canvas = document.createElement('canvas');
+    canvas.style.position = 'fixed';
+    canvas.style.inset = '0';
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.zIndex = '9999';
+    document.body.appendChild(canvas);
+    
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width = window.innerWidth;
+    var h = canvas.height = window.innerHeight;
+    
+    for (var i=0; i<count; i++) {
+      particles.push({
+        x: w / 2, y: h / 2,
+        vx: (Math.random() - 0.5) * (w > 600 ? 25 : 15),
+        vy: (Math.random() - 0.8) * (h > 600 ? 25 : 15),
+        size: Math.random() * 6 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rot: Math.random() * 360,
+        rotSpeed: (Math.random() - 0.5) * 10
+      });
+    }
+    
+    function render() {
+      ctx.clearRect(0, 0, w, h);
+      var active = false;
+      particles.forEach(function(p) {
+        p.vy += 0.5; // gravity
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.rotSpeed;
+        if (p.y < h + 20) active = true;
+        
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot * Math.PI / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+        ctx.restore();
+      });
+      if (active) requestAnimationFrame(render);
+      else document.body.removeChild(canvas);
+    }
+    render();
+  };
+
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* DuelZone — shared game page helpers */
+(function (global) {
+  'use strict';
+
+  function initGamePage(opts) {
+    var options = opts || {};
+
+
+    var back = document.getElementById('dz-back-hub');
+    if (back && !back._dzWired) {
+      back._dzWired = true;
+      back.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (typeof dzStopAllGames === 'function') dzStopAllGames();
+        if (options.onLeave) options.onLeave();
+        if (typeof dzGoHub === 'function') dzGoHub();
+        else window.location.href = 'index.html';
+      });
+    }
+
+    var restart = document.getElementById('dz-restart');
+    if (restart && options.onRestart && !restart._dzWired) {
+      restart._dzWired = true;
+      restart.addEventListener('click', options.onRestart);
+    }
+  }
+
+  function wireResultButtons(opts) {
+    var overlay = document.getElementById('dz-result-overlay');
+    if (!overlay) return;
+
+    var again = document.getElementById('dz-result-again');
+    if (again && opts.onAgain) {
+      again.onclick = function () {
+        overlay.classList.remove('show');
+        opts.onAgain();
+      };
+    }
+
+    var share = document.getElementById('dz-result-share');
+    if (share) {
+      share.onclick = function () {
+        if (typeof dzShareWin === 'function') {
+          dzShareWin({
+            title: opts.title,
+            subtitle: opts.subtitle,
+            stats: opts.stats
+          });
+        }
+      };
+    }
+  }
+
+  function showResult(opts) {
+    var overlay = document.getElementById('dz-result-overlay');
+    if (!overlay) return;
+    overlay.classList.add('show');
+    var title = document.getElementById('dz-result-title');
+    var sub = document.getElementById('dz-result-sub');
+    if (title) title.textContent = opts.title || 'Victory!';
+    
+    var statsCard = document.getElementById('dz-result-stats');
+    if (statsCard && opts.stats) {
+      statsCard.style.display = 'grid';
+      var timeEl = document.getElementById('dz-stat-time');
+      var accEl = document.getElementById('dz-stat-acc');
+      var xpEl = document.getElementById('dz-stat-xp');
+      if (timeEl) timeEl.textContent = opts.stats.time || '00:00';
+      if (accEl) accEl.textContent = opts.stats.accuracy || '100%';
+      if (xpEl) xpEl.textContent = opts.stats.xp || '+50';
+    } else if (statsCard) {
+      statsCard.style.display = 'none';
+    }
+
+    // Award XP and update subtitle in one pass
+    if (typeof DZPlayer !== 'undefined') {
+      var xpEarned = 50;
+      var isWin = opts.title && opts.title.toLowerCase().indexOf('win') >= 0;
+      if (isWin) {
+        xpEarned = 100;
+        if (typeof DZAudio !== 'undefined') DZAudio.playSFX('win');
+        if (typeof dzFireConfetti === 'function') dzFireConfetti();
+      }
+      DZPlayer.addMatch(isWin);
+      DZPlayer.addXP(xpEarned);
+      if (sub) {
+        sub.innerHTML = (opts.subtitle || '') + '<br><span style="color:var(--dz-cyan);font-weight:bold;margin-top:8px;display:inline-block;"> | +' + xpEarned + ' XP Earned!</span>';
+      }
+    } else {
+      if (sub) sub.textContent = opts.subtitle || '';
+    }
+
+    wireResultButtons(opts);
+  }
+
+  function hideResult() {
+    var overlay = document.getElementById('dz-result-overlay');
+    if (overlay) overlay.classList.remove('show');
+  }
+
+  global.dzInitGamePage = initGamePage;
+  global.dzShowResult = showResult;
+  global.dzHideResult = hideResult;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var GRID_SIZE = 10;
+  var SHIPS = [
+    { name: 'Carrier',    size: 5, icon: '🛳️' },
+    { name: 'Battleship', size: 4, icon: '⚓' },
+    { name: 'Cruiser',    size: 3, icon: '🚢' },
+    { name: 'Submarine',  size: 3, icon: '🔱' },
+    { name: 'Destroyer',  size: 2, icon: '⚡' }
+  ];
+  var COLS = ['A','B','C','D','E','F','G','H','I','J'];
+
+  var audioCtx = null;
+  function playSound(type, enabled) {
+    if (!enabled) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var now = audioCtx.currentTime;
+      if (type === 'ping') {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.3);
+        gain.gain.setValueAtTime(0.07, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.start(now); osc.stop(now + 0.3);
+      } else if (type === 'hit') {
+        for (var i = 0; i < 3; i++) {
+          (function(delay) {
+            var o = audioCtx.createOscillator();
+            var g = audioCtx.createGain();
+            o.type = 'sawtooth';
+            o.connect(g); g.connect(audioCtx.destination);
+            o.frequency.setValueAtTime(200 - delay * 40, now + delay * 0.05);
+            o.frequency.linearRampToValueAtTime(30, now + delay * 0.05 + 0.3);
+            g.gain.setValueAtTime(0.15, now + delay * 0.05);
+            g.gain.exponentialRampToValueAtTime(0.001, now + delay * 0.05 + 0.3);
+            o.start(now + delay * 0.05); o.stop(now + delay * 0.05 + 0.3);
+          })(i);
+        }
+      } else if (type === 'miss') {
+        var o2 = audioCtx.createOscillator();
+        var g2 = audioCtx.createGain();
+        o2.connect(g2); g2.connect(audioCtx.destination);
+        o2.frequency.setValueAtTime(300, now);
+        o2.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+        g2.gain.setValueAtTime(0.05, now);
+        g2.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        o2.start(now); o2.stop(now + 0.15);
+      } else if (type === 'win') {
+        [523.25, 659.25, 783.99, 1046.5].forEach(function(freq, i) {
+          var o3 = audioCtx.createOscillator();
+          var g3 = audioCtx.createGain();
+          o3.type = 'triangle';
+          o3.connect(g3); g3.connect(audioCtx.destination);
+          o3.frequency.setValueAtTime(freq, now + i * 0.1);
+          g3.gain.setValueAtTime(0.12, now + i * 0.1);
+          g3.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.4);
+          o3.start(now + i * 0.1); o3.stop(now + i * 0.1 + 0.4);
+        });
+      }
+    } catch (e) {}
+  }
+
+  function init(opts) {
+    opts = opts || {};
+    var container = opts.container || (opts.canvas && opts.canvas.parentElement);
+    if (!container) return { stop: function () {} };
+
+    var vsBot = opts.vsBot !== false;
+    var sound = opts.sound !== false;
+    var themeColor = opts.theme === 'green' ? '#10b981' : opts.theme === 'red' ? '#ef4444' : '#00e5ff';
+    var themeGlow = opts.theme === 'green' ? 'rgba(16,185,129,0.3)' : opts.theme === 'red' ? 'rgba(239,68,68,0.3)' : 'rgba(0,229,255,0.3)';
+
+    var running = true;
+    var playerGrid = [], botGrid = [];
+    var botHitsLeft = 0, playerHitsLeft = 0;
+    var msgEl, gridEl, fleetEl, botFleetEl;
+
+    container.innerHTML = '';
+
+    var style = document.createElement('style');
+    style.textContent = [
+      '.bs2-wrap { display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; max-width:440px; margin:0 auto; padding:6px; user-select:none; font-family:"Plus Jakarta Sans",sans-serif; }',
+      '.bs2-hud { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; width:100%; gap:8px; }',
+      '.bs2-hud-panel { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:8px 10px; }',
+      '.bs2-hud-label { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:1.2px; color:rgba(255,255,255,0.4); margin-bottom:4px; }',
+      '.bs2-hud-name { font-size:13px; font-weight:800; color:#fff; }',
+      '.bs2-hud-ships { font-size:11px; color:rgba(255,255,255,0.5); margin-top:2px; }',
+      '.bs2-vs { font-size:22px; font-weight:900; color:rgba(255,255,255,0.3); text-align:center; }',
+      '.bs2-fleet { display:flex; gap:4px; flex-wrap:wrap; width:100%; justify-content:center; }',
+      '.bs2-ship-chip { display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:20px; font-size:10px; font-weight:700; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.05); transition:all 0.3s; }',
+      '.bs2-ship-chip.sunk { opacity:0.25; text-decoration:line-through; filter:grayscale(1); }',
+      '.bs2-ship-pip { display:inline-block; width:6px; height:6px; border-radius:50%; background:' + themeColor + '; box-shadow:0 0 6px ' + themeColor + '; }',
+      '.bs2-grid-wrap { width:100%; position:relative; border-radius:16px; overflow:hidden; background:#060c18; border:2px solid rgba(255,255,255,0.07); box-shadow:0 0 40px rgba(0,0,0,0.7), inset 0 0 40px rgba(0,0,0,0.3); padding:4px; }',
+      '.bs2-radar-ring { position:absolute; border-radius:50%; border:1px solid ' + themeColor + '; opacity:0; animation:bs2ring 4s ease-out infinite; pointer-events:none; transform:translate(-50%,-50%); }',
+      '.bs2-radar-ring:nth-child(2) { animation-delay:1.3s; }',
+      '.bs2-radar-ring:nth-child(3) { animation-delay:2.6s; }',
+      '@keyframes bs2ring { 0%{width:0;height:0;opacity:0.7;left:50%;top:50%} 100%{width:300%;height:300%;opacity:0;left:50%;top:50%} }',
+      '.bs2-sweep { position:absolute; inset:0; background:conic-gradient(from 0deg, ' + themeColor.replace(')', ',0.15)') + ' 0deg, transparent 50deg, transparent 360deg); animation:bs2sweep 5s linear infinite; pointer-events:none; border-radius:14px; }',
+      '@keyframes bs2sweep { from{transform:rotate(0)} to{transform:rotate(360deg)} }',
+      '.bs2-coord-grid { display:grid; grid-template-columns:18px repeat(10,1fr); grid-template-rows:18px repeat(10,1fr); gap:2px; position:relative; z-index:3; }',
+      '.bs2-coord-label { display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:700; color:rgba(255,255,255,0.25); }',
+      '.bs2-cell { aspect-ratio:1; border-radius:4px; cursor:pointer; position:relative; overflow:hidden; background:rgba(8,18,38,0.9); border:1px solid rgba(255,255,255,0.06); transition:background 0.15s, border-color 0.15s; }',
+      '.bs2-cell:hover:not(.bs2-hit):not(.bs2-miss) { background:' + themeGlow + '; border-color:' + themeColor + '; }',
+      '.bs2-cell:hover:not(.bs2-hit):not(.bs2-miss)::after { content:""; position:absolute; inset:0; background:radial-gradient(circle,rgba(255,255,255,0.15) 0%,transparent 70%); }',
+      '.bs2-cell.bs2-hit { background:rgba(239,68,68,0.15) !important; border-color:rgba(239,68,68,0.5) !important; cursor:default; }',
+      '.bs2-cell.bs2-miss { background:rgba(59,130,246,0.08) !important; border-color:rgba(59,130,246,0.25) !important; cursor:default; }',
+      '.bs2-explosion { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; animation:bs2explode 0.5s cubic-bezier(0.175,0.885,0.32,1.275) forwards; }',
+      '@keyframes bs2explode { 0%{transform:scale(0) rotate(-20deg);opacity:0} 60%{transform:scale(1.3) rotate(5deg);opacity:1} 100%{transform:scale(1) rotate(0deg);opacity:1} }',
+      '.bs2-splash { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }',
+      '.bs2-splash::after { content:""; width:6px; height:6px; border-radius:50%; background:rgba(96,165,250,0.7); box-shadow:0 0 8px rgba(59,130,246,0.8); }',
+      '.bs2-cell.bs2-pulse::before { content:""; position:absolute; inset:0; border-radius:4px; border:2px solid ' + themeColor + '; animation:bs2cellpulse 0.6s ease-out forwards; }',
+      '@keyframes bs2cellpulse { 0%{opacity:1;transform:scale(0.5)} 100%{opacity:0;transform:scale(1.8)} }',
+      '.bs2-msg { width:100%; padding:10px 16px; border-radius:12px; font-size:12px; font-weight:700; text-align:center; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); color:rgba(255,255,255,0.8); transition:all 0.3s; }',
+      '.bs2-msg.bs2-msg-hit { background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.3); color:#fca5a5; }',
+      '.bs2-msg.bs2-msg-miss { background:rgba(59,130,246,0.08); border-color:rgba(59,130,246,0.2); color:#93c5fd; }',
+      '.bs2-msg.bs2-msg-warn { background:rgba(245,158,11,0.12); border-color:rgba(245,158,11,0.3); color:#fcd34d; }',
+    ].join('\n');
+    document.head.appendChild(style);
+
+    var wrap = document.createElement('div');
+    wrap.className = 'bs2-wrap';
+
+    /* HUD */
+    var hud = document.createElement('div');
+    hud.className = 'bs2-hud';
+    hud.innerHTML =
+      '<div class="bs2-hud-panel">' +
+        '<div class="bs2-hud-label">Commander</div>' +
+        '<div class="bs2-hud-name">You</div>' +
+        '<div class="bs2-hud-ships" id="bs2-your-ships">5 ships active</div>' +
+      '</div>' +
+      '<div class="bs2-vs">⚓</div>' +
+      '<div class="bs2-hud-panel" style="text-align:right">' +
+        '<div class="bs2-hud-label">Enemy</div>' +
+        '<div class="bs2-hud-name">' + (vsBot ? 'CPU Bot' : 'Player 2') + '</div>' +
+        '<div class="bs2-hud-ships" id="bs2-enemy-ships">5 ships remain</div>' +
+      '</div>';
+    wrap.appendChild(hud);
+
+    /* Fleet tracker */
+    fleetEl = document.createElement('div');
+    fleetEl.className = 'bs2-fleet';
+    wrap.appendChild(fleetEl);
+
+    /* Grid container */
+    var gridWrap = document.createElement('div');
+    gridWrap.className = 'bs2-grid-wrap';
+
+    /* Radar rings */
+    for (var ri = 0; ri < 3; ri++) {
+      var ring = document.createElement('div');
+      ring.className = 'bs2-radar-ring';
+      gridWrap.appendChild(ring);
+    }
+    /* Sweep */
+    var sweep = document.createElement('div');
+    sweep.className = 'bs2-sweep';
+    gridWrap.appendChild(sweep);
+
+    /* Coordinate grid */
+    gridEl = document.createElement('div');
+    gridEl.className = 'bs2-coord-grid';
+    gridWrap.appendChild(gridEl);
+    wrap.appendChild(gridWrap);
+
+    /* Message */
+    msgEl = document.createElement('div');
+    msgEl.className = 'bs2-msg';
+    msgEl.textContent = '🎯 Pick a coordinate — fire!';
+    wrap.appendChild(msgEl);
+
+    container.appendChild(wrap);
+
+    /* ── Game Logic ── */
+    function createEmptyGrid() {
+      var g = [];
+      for (var r = 0; r < GRID_SIZE; r++) {
+        g[r] = [];
+        for (var c = 0; c < GRID_SIZE; c++) g[r][c] = { ship: 0, hit: false };
+      }
+      return g;
+    }
+
+    function placeRandomShips(grid) {
+      var totalHits = 0;
+      SHIPS.forEach(function (s, index) {
+        var shipId = index + 1;
+        var placed = false;
+        while (!placed) {
+          var horiz = Math.random() < 0.5;
+          var r = Math.floor(Math.random() * (horiz ? GRID_SIZE : GRID_SIZE - s.size + 1));
+          var c = Math.floor(Math.random() * (horiz ? GRID_SIZE - s.size + 1 : GRID_SIZE));
+          var ok = true;
+          for (var i = 0; i < s.size; i++) {
+            var nr = r + (horiz ? 0 : i);
+            var nc = c + (horiz ? i : 0);
+            if (grid[nr][nc].ship !== 0) { ok = false; break; }
+          }
+          if (ok) {
+            for (var j = 0; j < s.size; j++) {
+              grid[r + (horiz ? 0 : j)][c + (horiz ? j : 0)].ship = shipId;
+            }
+            totalHits += s.size;
+            placed = true;
+          }
+        }
+      });
+      return totalHits;
+    }
+
+    function countSinksLeft(grid, shipId) {
+      for (var r = 0; r < GRID_SIZE; r++)
+        for (var c = 0; c < GRID_SIZE; c++)
+          if (grid[r][c].ship === shipId && !grid[r][c].hit) return true;
+      return false;
+    }
+
+    function updateFleet() {
+      fleetEl.innerHTML = '';
+      var enemySinksLeft = 0;
+      SHIPS.forEach(function(s, idx) {
+        var alive = countSinksLeft(botGrid, idx + 1);
+        if (alive) enemySinksLeft++;
+        var chip = document.createElement('div');
+        chip.className = 'bs2-ship-chip' + (alive ? '' : ' sunk');
+        chip.innerHTML = '<span>' + s.icon + '</span>' +
+          '<span class="bs2-ship-pip"></span>' +
+          '<span>' + s.name + '(' + s.size + ')</span>';
+        fleetEl.appendChild(chip);
+      });
+      var yourLeft = 0;
+      SHIPS.forEach(function(s, idx) { if (countSinksLeft(playerGrid, idx + 1)) yourLeft++; });
+      var ys = document.getElementById('bs2-your-ships');
+      var es = document.getElementById('bs2-enemy-ships');
+      if (ys) ys.textContent = yourLeft + ' ship' + (yourLeft !== 1 ? 's' : '') + ' active';
+      if (es) es.textContent = enemySinksLeft + ' ship' + (enemySinksLeft !== 1 ? 's' : '') + ' remain';
+    }
+
+    function setMsg(text, type) {
+      msgEl.className = 'bs2-msg' + (type ? ' bs2-msg-' + type : '');
+      msgEl.textContent = text;
+    }
+
+    function renderGrid() {
+      gridEl.innerHTML = '';
+
+      /* Corner */
+      var corner = document.createElement('div');
+      corner.className = 'bs2-coord-label';
+      gridEl.appendChild(corner);
+
+      /* Column labels: 1-10 */
+      for (var c = 0; c < GRID_SIZE; c++) {
+        var cl = document.createElement('div');
+        cl.className = 'bs2-coord-label';
+        cl.textContent = c + 1;
+        gridEl.appendChild(cl);
+      }
+
+      /* Rows */
+      for (var r = 0; r < GRID_SIZE; r++) {
+        /* Row label A-J */
+        var rl = document.createElement('div');
+        rl.className = 'bs2-coord-label';
+        rl.textContent = COLS[r];
+        gridEl.appendChild(rl);
+
+        for (var cc = 0; cc < GRID_SIZE; cc++) {
+          (function(row, col) {
+            var cell = document.createElement('div');
+            cell.className = 'bs2-cell';
+            var cd = botGrid[row][col];
+            if (cd.hit) {
+              if (cd.ship > 0) {
+                cell.classList.add('bs2-hit');
+                var expl = document.createElement('div');
+                expl.className = 'bs2-explosion';
+                expl.textContent = '💥';
+                cell.appendChild(expl);
+              } else {
+                cell.classList.add('bs2-miss');
+                var splash = document.createElement('div');
+                splash.className = 'bs2-splash';
+                cell.appendChild(splash);
+              }
+            }
+            cell.addEventListener('click', function() { fireAt(row, col); });
+            gridEl.appendChild(cell);
+          })(r, cc);
+        }
+      }
+      updateFleet();
+    }
+
+    function botTurn() {
+      if (!running) return;
+      var r, c;
+      do {
+        r = Math.floor(Math.random() * GRID_SIZE);
+        c = Math.floor(Math.random() * GRID_SIZE);
+      } while (playerGrid[r][c].hit);
+      playerGrid[r][c].hit = true;
+
+      if (playerGrid[r][c].ship > 0) {
+        playerHitsLeft--;
+        playSound('hit', sound);
+        setMsg('⚠️ Enemy struck your ship at [' + COLS[r] + (c + 1) + ']!', 'warn');
+        if (playerHitsLeft <= 0) {
+          running = false;
+          setMsg('💀 Your fleet is destroyed. Defeat!', 'warn');
+          renderGrid();
+          if (opts.onEnd) opts.onEnd({ winner: 'Enemy Navy', subtitle: 'All your ships were sunk' });
+          return;
+        }
+      } else {
+        setMsg('✨ Enemy missed at [' + COLS[r] + (c + 1) + ']!', '');
+      }
+      renderGrid();
+    }
+
+    function fireAt(r, c) {
+      if (!running || botGrid[r][c].hit) return;
+      botGrid[r][c].hit = true;
+      playSound('ping', sound);
+
+      /* pulse animation on the cell briefly */
+      renderGrid();
+
+      if (botGrid[r][c].ship > 0) {
+        botHitsLeft--;
+        playSound('hit', sound);
+        setMsg('💥 DIRECT HIT at sector [' + COLS[r] + (c + 1) + ']!', 'hit');
+        if (botHitsLeft <= 0) {
+          running = false;
+          playSound('win', sound);
+          setMsg('🏆 VICTORY! All enemy ships destroyed!', 'hit');
+          if (opts.onEnd) {
+            setTimeout(function() {
+              opts.onEnd({ winner: 'Commander', subtitle: 'Enemy Fleet Annihilated!' });
+            }, 1000);
+          }
+          return;
+        }
+      } else {
+        playSound('miss', sound);
+        setMsg('🌊 Splash! Sector [' + COLS[r] + (c + 1) + '] clear.', 'miss');
+      }
+
+      if (running) setTimeout(botTurn, 900);
+    }
+
+    function reset() {
+      playerGrid = createEmptyGrid();
+      botGrid = createEmptyGrid();
+      playerHitsLeft = placeRandomShips(playerGrid);
+      botHitsLeft = placeRandomShips(botGrid);
+      running = true;
+      setMsg('🎯 Pick a coordinate — fire!', '');
+      renderGrid();
+    }
+
+    reset();
+
+    return { stop: function() { running = false; } };
+  }
+
+  if (!window.DZGames) window.DZGames = {};
+  window.DZGames['battleship'] = init;
+})();
+</script>
+<script>
+(function (global) {
+  'use strict';
+
+  // Preload QRious
+  function loadQRious(cb) {
+    if (global.QRious) { if (cb) cb(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
+    s.onload = function() { if (cb) cb(); };
+    s.onerror = function() { if (cb) cb(); };
+    document.head.appendChild(s);
+  }
+  loadQRious();
+
+  function _safe(text) {
+    if (!text) return '';
+    return String(text).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '');
+  }
+
+  function _hex2rgba(hex, alpha) {
+    var h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    var r = parseInt(h.slice(0, 2), 16);
+    var g = parseInt(h.slice(2, 4), 16);
+    var b = parseInt(h.slice(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
+
+  function drawRoundedRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawGlitchText(ctx, text, x, y, size) {
+    ctx.font = '900 ' + size + 'px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Cyan offset
+    ctx.fillStyle = '#00e5ff';
+    ctx.fillText(text, x - 4, y - 3);
+    // Magenta offset
+    ctx.fillStyle = '#f43f5e';
+    ctx.fillText(text, x + 4, y + 3);
+    // White top
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, x, y);
+  }
+
+  function createShareCard(options) {
+    var opts = options || {};
+    var w = 540;
+    var h = 960; // Vertical format matching user screenshot
+    var canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    var ctx = canvas.getContext('2d');
+
+    // Deep Black background
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(0, 0, w, h);
+
+    // Floating colorful squares with gradients (retro aesthetic)
+    var squares = [
+      { x: 80, y: 150, size: 80, r: -15, color1: '#f97316', color2: '#fbbf24' },
+      { x: 420, y: 220, size: 70, r: 10, color1: '#a855f7', color2: '#ec4899' },
+      { x: 120, y: 820, size: 80, r: -20, color1: '#3b82f6', color2: '#00e5ff' },
+      { x: 450, y: 780, size: 65, r: 25, color1: '#ec4899', color2: '#f43f5e' },
+      { x: 90, y: 550, size: 55, r: 5, color1: '#10b981', color2: '#34d399' },
+      { x: 480, y: 480, size: 75, r: -12, color1: '#8b5cf6', color2: '#6366f1' }
+    ];
+
+    squares.forEach(function(sq) {
+      ctx.save();
+      ctx.translate(sq.x, sq.y);
+      ctx.rotate(sq.r * Math.PI / 180);
+      var grad = ctx.createLinearGradient(0, 0, sq.size, sq.size);
+      grad.addColorStop(0, sq.color1);
+      grad.addColorStop(1, sq.color2);
+      ctx.fillStyle = grad;
+      drawRoundedRect(ctx, -sq.size/2, -sq.size/2, sq.size, sq.size, 20);
+      ctx.restore();
+    });
+
+    // Top Right: Player info (Avatar, Name, Level)
+    if (typeof window !== 'undefined' && window.DZPlayer) {
+      var pName = (window.DZPlayer.data && window.DZPlayer.data.name) || 'Player';
+      var pLevel = 'Lv.' + ((window.DZPlayer.data && window.DZPlayer.data.level) || 1);
+      var avatar = (window.DZPlayer.data && window.DZPlayer.data.avatar) || '👽';
+      
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      
+      // Avatar
+      ctx.font = '36px sans-serif';
+      ctx.fillText(avatar, w - 30, 40);
+
+      // Name
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 24px Plus Jakarta Sans, sans-serif';
+      ctx.fillText(_safe(pName), w - 85, 35);
+      
+      // Level
+      ctx.fillStyle = '#00e5ff';
+      ctx.font = 'bold 16px Plus Jakarta Sans, sans-serif';
+      ctx.fillText(_safe(pLevel), w - 85, 65);
+    }
+
+    // Main Text (Glitch Retro Style)
+    drawGlitchText(ctx, "DUELZONE", w/2, 280, 75);
+    drawGlitchText(ctx, _safe((opts.title || "VICTORY").toUpperCase()), w/2, 400, 52);
+
+    if (opts.stats) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 42px Plus Jakarta Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(_safe(opts.stats), w/2, 510);
+    }
+
+    // QR Code (Directly drawn from QRious canvas synchronously)
+    if (typeof QRious !== 'undefined') {
+      try {
+        var gameUrl = window.location.href;
+        var qr = new QRious({
+          value: gameUrl,
+          size: 160,
+          background: '#ffffff',
+          foreground: '#050505',
+          level: 'M'
+        });
+        
+        ctx.fillStyle = '#ffffff';
+        drawRoundedRect(ctx, w/2 - 95, 610, 190, 190, 16);
+        
+        // Draw the QR canvas directly onto the share canvas (100% synchronous)
+        ctx.drawImage(qr.canvas, w/2 - 80, 625, 160, 160);
+        
+        ctx.fillStyle = '#a1a1aa';
+        ctx.font = 'bold 16px Plus Jakarta Sans, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText("SCAN TO PLAY", w/2, 830);
+      } catch (err) {
+        console.warn('QR code generation error:', err);
+      }
+    }
+
+    return canvas;
+  }
+
+  function shareWin(options) {
+    loadQRious(function () {
+      var canvas = createShareCard(options);
+      var dataUrl = canvas.toDataURL('image/png');
+      if (navigator.share && options.tryNativeShare) {
+        canvas.toBlob(function (blob) {
+          if (!blob) return downloadDataUrl(dataUrl, 'duelzone-win.png');
+          var file = new File([blob], 'duelzone-win.png', { type: 'image/png' });
+          navigator.share({ files: [file], title: _safe(options.title || 'DuelZone Win') })
+            .catch(function () { downloadDataUrl(dataUrl, 'duelzone-win.png'); });
+        });
+      } else {
+        downloadDataUrl(dataUrl, 'duelzone-win.png');
+      }
+    });
+  }
+
+  function downloadDataUrl(dataUrl, filename) {
+    var a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    a.click();
+  }
+
+  global.dzShareSafe = _safe;
+  global.dzShareHex2Rgba = _hex2rgba;
+  global.dzCreateShareCard = createShareCard;
+  global.dzShareWin = shareWin;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+
+<script>
+(function() {
+  'use strict';
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.dz-mode-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        document.querySelectorAll('.dz-mode-card').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+      });
+    });
+    document.querySelectorAll('.dz-swatch').forEach(function(card) {
+      card.addEventListener('click', function() {
+        document.querySelectorAll('.dz-swatch').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+      });
+    });
+
+    var setup = document.getElementById('bs-setup');
+    var play = document.getElementById('bs-play');
+    var area = document.getElementById('bs-game-area');
+    var instance = null;
+
+    document.getElementById('bs-start-btn').addEventListener('click', function() {
+      var modeCard = document.querySelector('.dz-mode-card.selected');
+      var vsBot = modeCard ? modeCard.dataset.mode === 'bot' : true;
+      var themeCard = document.querySelector('.dz-swatch.selected');
+      var theme = themeCard ? themeCard.dataset.theme : 'cyan';
+      var sound = document.getElementById('bs-sound-toggle').checked;
+
+      setup.classList.add('hidden');
+      play.classList.remove('hidden');
+      if (instance && instance.stop) instance.stop();
+
+      setTimeout(function() {
+        try {
+          if (window.DZGames && window.DZGames['battleship']) {
+          instance = window.DZGames['battleship']({
+            container: area,
+            vsBot: vsBot,
+            theme: theme,
+            sound: sound,
+            onEnd: function(r) {
+              if (typeof dzShowResult === 'function') {
+                dzShowResult({
+                  title: r.winner + ' Victory!',
+                  subtitle: r.subtitle || 'All Enemy Ships Destroyed',
+                  onAgain: function() {
+                    if (typeof dzHideResult === 'function') dzHideResult();
+                    play.classList.add('hidden');
+                    setup.classList.remove('hidden');
+                  }
+                });
+              }
+            }
+          });
+          } else {
+            area.innerHTML = '<div style="color:#ff4444; padding:20px; font-family:sans-serif; text-align:center;">Error: Game script not found or failed to load.</div>';
+          }
+        } catch (err) {
+          area.innerHTML = '<div style="color:#ff4444; padding:20px; font-family:sans-serif; text-align:center;">Error: ' + err.message + '</div>';
+        }
+      }, 60);
+    });
+
+    document.getElementById('dz-restart').addEventListener('click', function() {
+      if (instance && instance.stop) instance.stop();
+      if (typeof dzHideResult === 'function') dzHideResult();
+      play.classList.add('hidden');
+      setup.classList.remove('hidden');
+    });
+
+    if (typeof dzInitGamePage === 'function') dzInitGamePage({});
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1244 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connect Four · DuelZone</title>
+  <meta name="description" content="Play Connect Four on DuelZone — vs Friend or vs Bot with 3D disc animations and custom themes." />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="stylesheet" href="duelzone.css" />
+  <style>
+    .hidden { display: none !important; }
+
+    /* ── Connect4 Setup ── */
+    .dz-setup-page .dz-setup-wrap {
+      display: flex; flex-direction: column; gap: 14px;
+      width: 100%; max-width: 400px; margin: 0 auto; padding: 16px;
+      font-family: 'Plus Jakarta Sans', sans-serif; color: var(--dz-text-primary);
+    }
+    .dz-hero-heading {
+      font-size: 28px; font-weight: 800;
+      background: var(--dz-gradient-text);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 2px;
+    }
+    .dz-section-title {
+      font-size: 11px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--dz-text-secondary);
+    }
+    .dz-mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .dz-mode-card {
+      background: var(--dz-bg-card); border: 2px solid var(--dz-border);
+      border-radius: var(--dz-radius-md); padding: 18px 12px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      cursor: pointer; transition: all var(--dz-transition); text-align: center;
+    }
+    .dz-mode-card:hover { border-color: var(--dz-border-light); transform: translateY(-2px); }
+    .dz-mode-card.selected { border-color: var(--dz-cyan); box-shadow: 0 0 12px rgba(0,229,255,0.15); }
+    .dz-mode-icon { font-size: 26px; }
+    .dz-mode-name { font-size: 14px; font-weight: 700; }
+    .dz-mode-desc { font-size: 10px; color: var(--dz-text-secondary); }
+
+    .dz-swatch-row { display: flex; gap: 12px; }
+    .dz-swatch {
+      flex: 1; padding: 10px; border-radius: var(--dz-radius-md);
+      background: var(--dz-bg-card); border: 2px solid var(--dz-border);
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: all var(--dz-transition);
+    }
+    .dz-swatch.selected { border-color: var(--dz-cyan); box-shadow: 0 0 10px rgba(0,229,255,0.15); }
+    .c4-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+
+    .dz-toggle-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-bottom: 8px; border-bottom: 1.5px solid var(--dz-border);
+    }
+    .dz-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .dz-toggle input { opacity: 0; width: 0; height: 0; }
+    .dz-toggle-track {
+      position: absolute; cursor: pointer; inset: 0;
+      background-color: var(--dz-border); transition: .3s; border-radius: 24px;
+    }
+    .dz-toggle-track:before {
+      position: absolute; content: ""; height: 16px; width: 16px;
+      left: 4px; bottom: 4px; background-color: white; transition: .3s; border-radius: 50%;
+    }
+    .dz-toggle input:checked + .dz-toggle-track { background-color: var(--dz-cyan); }
+    .dz-toggle input:checked + .dz-toggle-track:before { transform: translateX(20px); }
+
+    /* ── Connect4 Board UI ── */
+    .c4-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      width: 100%; max-width: 380px; margin: 0 auto; padding: 8px; user-select: none;
+    }
+    .c4-status-bar {
+      display: flex; justify-content: space-between; align-items: center; width: 100%;
+      background: var(--dz-bg-card); border: 1px solid var(--dz-border);
+      padding: 10px 14px; border-radius: var(--dz-radius-md);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .c4-player { display: flex; align-items: center; gap: 8px; opacity: 0.4; transition: all 0.3s; }
+    .c4-player.active { opacity: 1; transform: scale(1.03); }
+    .c4-p1-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--p1-color, #ff3366); box-shadow: 0 0 8px var(--p1-color, #ff3366); }
+    .c4-p2-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--p2-color, #ffcc00); box-shadow: 0 0 8px var(--p2-color, #ffcc00); }
+    .c4-turn-badge {
+      font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--dz-cyan); background: rgba(0,229,255,0.08); padding: 4px 10px;
+      border-radius: var(--dz-radius-pill); border: 1px solid rgba(0,229,255,0.2);
+    }
+    
+    .c4-column-arrows {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; width: 100%; padding: 0 6px;
+    }
+    .c4-arrow-btn {
+      background: transparent; border: none; color: var(--dz-text-secondary);
+      font-size: 18px; cursor: pointer; padding: 4px 0; transition: all 0.2s;
+      display: flex; justify-content: center; align-items: center;
+    }
+    .c4-arrow-btn:hover { color: var(--dz-cyan); transform: translateY(2px); }
+
+    .c4-board-container {
+      background: linear-gradient(145deg, #1b263b, #0f172a);
+      border: 4px solid #334155; border-radius: 16px;
+      padding: 10px; width: 100%; box-shadow: 0 12px 28px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.1);
+    }
+    .c4-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; width: 100%;
+    }
+    .c4-cell {
+      position: relative; aspect-ratio: 1; background: #090d16; border-radius: 50%;
+      box-shadow: inset 0 4px 6px rgba(0,0,0,0.8), 0 1px 2px rgba(255,255,255,0.05);
+      cursor: pointer; overflow: hidden; display: flex; align-items: center; justify-content: center;
+    }
+    .c4-disc {
+      width: 90%; height: 90%; border-radius: 50%;
+      transform: translateY(-200%); transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      box-shadow: inset 0 -3px 5px rgba(0,0,0,0.4), 0 3px 6px rgba(0,0,0,0.3);
+    }
+    .c4-disc.dropped { transform: translateY(0); }
+    .c4-disc.p1 {
+      background: radial-gradient(circle at 35% 35%, var(--p1-light, #ff6688), var(--p1-color, #ff3366), var(--p1-dark, #cc0033));
+      border: 2px solid var(--p1-light, #ff6688);
+    }
+    .c4-disc.p2 {
+      background: radial-gradient(circle at 35% 35%, var(--p2-light, #ffea70), var(--p2-color, #ffcc00), var(--p2-dark, #cc9900));
+      border: 2px solid var(--p2-light, #ffea70);
+    }
+    .c4-disc.winning {
+      animation: c4Pulse 0.8s infinite alternate;
+    }
+    @keyframes c4Pulse {
+      0% { transform: scale(0.9); box-shadow: 0 0 12px var(--dz-cyan); }
+      100% { transform: scale(1.08); box-shadow: 0 0 20px var(--dz-cyan); }
+    }
+    .c4-msg-bar {
+      font-size: 13px; font-weight: 600; color: var(--dz-text-primary); text-align: center;
+      background: var(--dz-bg-card); padding: 8px 18px; border-radius: var(--dz-radius-pill);
+      border: 1px solid var(--dz-border); box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+  </style>
+</head>
+<body>
+<div class="dz-app">
+  <header class="dz-topbar">
+    <a class="dz-icon-btn" id="dz-back-hub" href="index.html" aria-label="Back">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </a>
+    <span class="dz-logo" style="font-size:17px;">Connect Four</span>
+    <div class="dz-topbar-actions">
+      <button class="dz-icon-btn" id="dz-restart" type="button" aria-label="Restart">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.08-5"/></svg>
+      </button>
+      <button class="dz-theme-toggle" id="themeToggle" type="button">
+        <svg id="iconMoon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg id="iconSun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Setup Screen -->
+  <div id="c4-setup">
+    <div class="dz-setup-page dz-setup-wrap">
+      <p class="dz-hero-eyebrow">Connect Four</p>
+      <h2 class="dz-hero-heading">Choose Mode</h2>
+      <p style="color:var(--dz-text-secondary);font-size:13px;margin-bottom:12px;">Configure match settings below</p>
+
+      <div class="dz-section-title">Match Mode</div>
+      <div class="dz-mode-grid">
+        <div class="dz-mode-card selected" data-mode="friend">
+          <span class="dz-mode-icon">🤝</span>
+          <span class="dz-mode-name">vs Friend</span>
+          <span class="dz-mode-desc">Local 2 Player</span>
+        </div>
+        <div class="dz-mode-card" data-mode="bot">
+          <span class="dz-mode-icon">🤖</span>
+          <span class="dz-mode-name">vs Bot AI</span>
+          <span class="dz-mode-desc">Single Player</span>
+        </div>
+      </div>
+
+      <div class="dz-section-title" style="margin-top:16px;">Color Theme</div>
+      <div class="dz-swatch-row">
+        <div class="dz-swatch selected" data-theme="classic">
+          <span class="c4-dot" style="background:#ff3366"></span>
+          <span class="c4-dot" style="background:#ffcc00"></span>
+          <span style="font-size:12px;font-weight:700">Classic</span>
+        </div>
+        <div class="dz-swatch" data-theme="neon">
+          <span class="c4-dot" style="background:#00e5ff"></span>
+          <span class="c4-dot" style="background:#ff007f"></span>
+          <span style="font-size:12px;font-weight:700">Neon</span>
+        </div>
+        <div class="dz-swatch" data-theme="royal">
+          <span class="c4-dot" style="background:#ffd700"></span>
+          <span class="c4-dot" style="background:#a855f7"></span>
+          <span style="font-size:12px;font-weight:700">Royal</span>
+        </div>
+      </div>
+
+      <div class="dz-section-title" style="margin-top:16px;">Settings</div>
+      <div class="dz-toggle-row">
+        <span style="font-size:14px;font-weight:600">Sound Effects</span>
+        <label class="dz-toggle">
+          <input type="checkbox" checked id="c4-sound-toggle">
+          <span class="dz-toggle-track"></span><span class="dz-toggle-thumb"></span>
+        </label>
+      </div>
+
+      <button class="dz-btn dz-btn-primary" id="c4-start-btn" type="button"
+              style="margin-top:20px;width:100%;border-radius:var(--dz-radius-xl);font-size:14px;font-weight:700;">
+        START MATCH
+      </button>
+    </div>
+  </div>
+
+  <!-- Play Screen -->
+  <div id="c4-play" class="hidden">
+    <div id="c4-game-area"></div>
+  </div>
+</div>
+
+<div id="dz-result-overlay">
+  <div class="dz-result-page" style="max-width:320px;">
+    <div class="dz-result-trophy">🔴</div>
+    <h2 class="dz-result-heading" id="dz-result-title">Victory!</h2>
+    <p class="dz-result-subtitle" id="dz-result-sub"></p>
+    <div class="dz-result-actions">
+      <button class="dz-btn dz-btn-primary" id="dz-result-again" type="button">PLAY AGAIN</button>
+      <button class="dz-btn dz-btn-secondary" id="dz-result-share" type="button">SHARE</button>
+    </div>
+    <a class="dz-see-all" href="index.html" style="margin-top:8px;display:block;">← Back to Hub</a>
+  </div>
+</div>
+
+<script>
+/* DuelZone — game registry. Every game must be registered or findGame() returns null. */
+(function (global) {
+  'use strict';
+
+
+  var GAMES = [
+    { id: 'chess', title: 'Chess', icon: '♟️', desc: 'Outsmart your rival', category: 'strategy', modes: 'pvp+bot', status: 'live', href: 'chess.html', plays: '14.2k', badge: 'hot' },
+    { id: 'ludo', title: 'Ludo', icon: '🎲', desc: 'Roll. Race. Win.', category: 'board', modes: 'pvp', status: 'live', href: 'ludo.html', plays: '9.8k', badge: 'new' },
+    { id: 'tetris', title: 'Tetris', icon: '🟦', desc: 'Stack to survive', category: 'arcade', modes: 'solo', status: 'live', href: 'tetris.html', plays: '6.4k' },
+    { id: 'battleship', title: 'Battleship', icon: '🚢', desc: 'Sink or be sunk', category: 'strategy', modes: 'pvp+bot', status: 'live', href: 'battleship.html', plays: '5.2k' },
+    { id: 'checkers', title: 'Checkers', icon: '⬛', desc: 'Jump and crown', category: 'strategy', modes: 'pvp+bot', status: 'live', href: 'checkers.html', plays: '4.8k' },
+    { id: 'carrom', title: 'Carrom', icon: '🎯', desc: 'Flick. Pocket. Score.', category: 'board', modes: 'pvp', status: 'soon', href: null, plays: 'Coming soon', badge: 'soon' },
+    { id: 'sudoku', title: 'Sudoku', icon: '🔢', desc: 'Fill the grid', category: 'puzzle', modes: 'solo', status: 'live', href: 'sudoku.html', plays: '4.1k' },
+    { id: 'minesweeper', title: 'Minesweeper', icon: '💣', desc: 'One wrong move...', category: 'puzzle', modes: 'solo', status: 'live', href: 'minesweeper.html', plays: '3.1k', badge: 'new' },
+    { id: 'airhockey', title: 'Air Hockey', icon: '🏒', desc: 'Slide and score', category: 'arcade', modes: 'pvp', status: 'live', href: 'airhockey.html', plays: '2.9k' },
+    { id: 'tanks', title: 'Tanks Arena', icon: '🛡️', desc: 'Blast your rival', category: 'arcade', modes: 'pvp', status: 'live', href: 'tanks.html', plays: '2.7k' },
+    { id: 'bomberman', title: 'Bomberman', icon: '💥', desc: 'Bomb battle', category: 'arcade', modes: 'pvp', status: 'live', href: 'bomberman.html', plays: '2.5k' },
+    { id: 'starcatcher', title: 'Star Catcher', icon: '⭐', desc: 'Catch falling stars', category: 'arcade', modes: 'solo', status: 'live', href: 'starcatcher.html', plays: '2.3k' },
+    { id: 'spacedodge', title: 'Space Dodge', icon: '🚀', desc: 'Dodge asteroids', category: 'arcade', modes: 'solo', status: 'live', href: 'spacedodge.html', plays: '2.1k' },
+    { id: 'territory', title: 'Territory', icon: '🗺️', desc: 'Claim the map', category: 'strategy', modes: 'pvp', status: 'live', href: 'territory.html', plays: '2.0k' },
+    { id: 'pingpong', title: 'Ping Pong', icon: '🏓', desc: 'Classic paddle duel', category: 'arcade', modes: 'pvp', status: 'live', href: 'pingpong.html', plays: '1.9k' },
+    { id: 'darts', title: 'Darts', icon: '🎯', desc: 'Hit the bullseye', category: 'arcade', modes: 'solo+pvp', status: 'live', href: 'darts.html', plays: '1.8k' },
+    { id: 'reaction', title: 'Reaction Test', icon: '⚡', desc: 'Tap when it turns green', category: 'casual', modes: 'solo', status: 'live', href: 'reaction.html', plays: '1.7k' },
+    { id: 'snake', title: 'Snake Duel', icon: '🐍', desc: 'Grow or crash', category: 'arcade', modes: 'pvp', status: 'live', href: 'snake.html', plays: '1.6k' },
+    { id: 'connect4', title: 'Connect Four', icon: '🔴', desc: 'Four in a row', category: 'board', modes: 'pvp', status: 'live', href: 'connect4.html', plays: '1.5k' },
+    { id: 'wordduel', title: 'Word Duel', icon: '📝', desc: 'Race to type', category: 'casual', modes: 'pvp', status: 'live', href: 'wordduel.html', plays: '1.4k' },
+    { id: 'pool', title: '8-Ball Pool', icon: '🎱', desc: 'Sink the eight', category: 'arcade', modes: 'pvp', status: 'live', href: 'pool.html', plays: '1.3k' },
+    { id: 'blackjack', title: 'Blackjack', icon: '🃏', desc: 'Beat the dealer', category: 'card', modes: 'solo', status: 'live', href: 'blackjack.html', plays: '1.2k' },
+    { id: 'memory', title: 'Memory Match', icon: '🧠', desc: 'Flip and remember', category: 'puzzle', modes: 'solo', status: 'live', href: 'memory.html', plays: '1.1k' },
+    { id: '2048', title: '2048 Duel', icon: '🔲', desc: 'Merge to win', category: 'puzzle', modes: 'pvp', status: 'live', href: 'game2048.html', plays: '1.0k' },
+    { id: 'pong', title: 'Pong Classic', icon: '🕹️', desc: 'Retro paddle war', category: 'arcade', modes: 'pvp', status: 'live', href: 'pong.html', plays: '980' }
+  ];
+
+  var FILTER_MAP = {
+    All: null,
+    Strategy: ['strategy'],
+    Board: ['board'],
+    Arcade: ['arcade'],
+    Puzzle: ['puzzle'],
+    Card: ['card'],
+    Casual: ['casual']
+  };
+
+  function findGame(id) {
+    if (!id) return null;
+    var key = String(id).toLowerCase();
+    for (var i = 0; i < GAMES.length; i++) {
+      if (GAMES[i].id === key) return GAMES[i];
+    }
+    return null;
+  }
+
+  function liveGames() {
+    return GAMES.filter(function (g) { return g.status === 'live'; });
+  }
+
+  function topRated() {
+    return liveGames().slice().sort(function (a, b) {
+      var pa = parseFloat(String(a.plays).replace(/[^\d.]/g, '')) || 0;
+      var pb = parseFloat(String(b.plays).replace(/[^\d.]/g, '')) || 0;
+      return pb - pa;
+    });
+  }
+
+  global.DZ_GAMES = GAMES;
+  global.DZ_FILTER_MAP = FILTER_MAP;
+  global.findGame = findGame;
+  global.dzLiveGames = liveGames;
+  global.dzTopRated = topRated;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* DuelZone — theme persistence via localStorage */
+(function (global) {
+  'use strict';
+
+  var STORAGE_KEY = 'dz-theme';
+
+  function getTheme() {
+    try {
+      return localStorage.getItem(STORAGE_KEY) || 'dark';
+    } catch (e) {
+      return 'dark';
+    }
+  }
+
+  function setTheme(theme) {
+    var t = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    try {
+      localStorage.setItem(STORAGE_KEY, t);
+    } catch (e) { /* private browsing */ }
+    syncToggleIcons(t);
+    return t;
+  }
+
+  function syncToggleIcons(theme) {
+    var moon = document.getElementById('iconMoon');
+    var sun = document.getElementById('iconSun');
+    if (!moon || !sun) return;
+    var isLight = theme === 'light';
+    moon.style.display = isLight ? 'block' : 'none';
+    sun.style.display = isLight ? 'none' : 'block';
+  }
+
+  function toggleTheme() {
+    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+    return setTheme(current === 'light' ? 'dark' : 'light');
+  }
+
+  function bindThemeToggle(btnId) {
+    var btn = document.getElementById(btnId || 'themeToggle');
+    if (!btn || btn._dzThemeWired) return;
+    btn._dzThemeWired = true;
+    btn.addEventListener('click', toggleTheme);
+  }
+
+  setTheme(getTheme());
+
+  global.dzGetTheme = getTheme;
+  global.dzSetTheme = setTheme;
+  global.dzToggleTheme = toggleTheme;
+  global.dzBindThemeToggle = bindThemeToggle;
+  global.dzSyncThemeIcons = function () { syncToggleIcons(getTheme()); };
+
+  document.addEventListener('DOMContentLoaded', function () {
+    syncToggleIcons(getTheme());
+    bindThemeToggle('themeToggle');
+  });
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* DuelZone — Core Logic, Player Profile, and Global Audio */
+(function (global) {
+  'use strict';
+
+  // --- GAME LIFECYCLE ---
+  var gameLoops = [];
+  function registerGameLoop(fn) { gameLoops.push(fn); }
+  function unregisterGameLoop(fn) { gameLoops = gameLoops.filter(function (f) { return f !== fn; }); }
+  function stopAllGames() {
+    gameLoops.forEach(function (fn) { try { fn(); } catch (e) {} });
+    gameLoops = [];
+  }
+
+  // --- PLAYER PROFILE & XP SYSTEM ---
+  var DZPlayer = {
+    data: {
+      name: "Player",
+      avatar: "👽",
+      xp: 0,
+      level: 1,
+      matches: 0,
+      wins: 0,
+      prefs: { music: false, sfx: true }
+    },
+    load: function() {
+      try {
+        var d = localStorage.getItem('dz_player_v1');
+        if (d) {
+          var parsed = JSON.parse(d);
+          for (var k in parsed) {
+            if (parsed.hasOwnProperty(k)) this.data[k] = parsed[k];
+          }
+        }
+      } catch(e) {}
+      this.recalcLevel();
+    },
+    save: function() {
+      try { localStorage.setItem('dz_player_v1', JSON.stringify(this.data)); } catch(e) {}
+    },
+    recalcLevel: function() {
+      this.data.level = Math.floor(Math.pow(this.data.xp / 100, 0.5)) + 1;
+    },
+    addXP: function(amount) {
+      var oldLevel = this.data.level;
+      this.data.xp += amount;
+      this.recalcLevel();
+      this.save();
+      if (this.data.level > oldLevel) {
+        if (typeof DZAudio !== 'undefined') DZAudio.playSFX('levelup');
+        if (typeof dzFireConfetti === 'function') dzFireConfetti();
+      }
+    },
+    addMatch: function(won) {
+      this.data.matches++;
+      if (won) this.data.wins++;
+      this.save();
+    },
+    setName: function(newName) {
+      if (newName && newName.trim().length > 0) {
+        this.data.name = newName.trim().substring(0, 15); // limit length
+        this.save();
+      }
+    },
+    xpForNextLevel: function() {
+      return Math.pow(this.data.level, 2) * 100;
+    },
+    xpForCurrentLevel: function() {
+      return Math.pow(this.data.level - 1, 2) * 100;
+    },
+    getProgressPercent: function() {
+      var currentFloor = this.xpForCurrentLevel();
+      var nextCeil = this.xpForNextLevel();
+      var range = nextCeil - currentFloor;
+      var into = this.data.xp - currentFloor;
+      return Math.min(100, Math.max(0, (into / range) * 100));
+    }
+  };
+  DZPlayer.load();
+
+  // --- GLOBAL AUDIO GENERATOR ---
+  var DZAudio = {
+    ctx: null,
+    bgmNodes: [],
+    initialized: false,
+    init: function() {
+      if (this.initialized) return;
+      if (!this.ctx) {
+        var AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) this.ctx = new AudioContext();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+      this.initialized = true;
+      if (DZPlayer.data.prefs.music) this.playBGM();
+    },
+    playBGM: function() {
+      this.stopBGM();
+      if (!DZPlayer.data.prefs.music || !this.ctx) return;
+      var t = this.ctx.currentTime;
+      
+      var osc1 = this.ctx.createOscillator();
+      var gain1 = this.ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.value = 110.00;
+      gain1.gain.setValueAtTime(0, t);
+      gain1.gain.linearRampToValueAtTime(0.04, t + 4);
+      osc1.connect(gain1); gain1.connect(this.ctx.destination);
+      osc1.start(t);
+      this.bgmNodes.push({o: osc1, g: gain1});
+      
+      var osc2 = this.ctx.createOscillator();
+      var gain2 = this.ctx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.value = 164.81;
+      gain2.gain.setValueAtTime(0, t);
+      gain2.gain.linearRampToValueAtTime(0.02, t + 6);
+      osc2.connect(gain2); gain2.connect(this.ctx.destination);
+      osc2.start(t);
+      this.bgmNodes.push({o: osc2, g: gain2});
+    },
+    stopBGM: function() {
+      var t = this.ctx ? this.ctx.currentTime : 0;
+      this.bgmNodes.forEach(function(n) {
+        try {
+          n.g.gain.linearRampToValueAtTime(0, t + 1);
+          setTimeout(function() { try { n.o.stop(); } catch(e){} }, 1100);
+        } catch(e) {}
+      });
+      this.bgmNodes = [];
+    },
+    toggleMusic: function(on) {
+      DZPlayer.data.prefs.music = on;
+      DZPlayer.save();
+      if (on) {
+        if (!this.initialized) this.init();
+        else this.playBGM();
+      } else {
+        this.stopBGM();
+      }
+    },
+    toggleSFX: function(on) {
+      DZPlayer.data.prefs.sfx = on;
+      DZPlayer.save();
+    },
+    isSFXEnabled: function() {
+      return DZPlayer.data.prefs.sfx;
+    },
+    playSFX: function(type) {
+      if (!this.isSFXEnabled() || !this.ctx) return;
+      var t = this.ctx.currentTime;
+      var osc = this.ctx.createOscillator();
+      var gain = this.ctx.createGain();
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      if (type === 'click') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, t);
+        osc.frequency.exponentialRampToValueAtTime(400, t + 0.05);
+        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+        osc.start(t);
+        osc.stop(t + 0.05);
+      } else if (type === 'win') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(400, t);
+        osc.frequency.setValueAtTime(500, t + 0.1);
+        osc.frequency.setValueAtTime(600, t + 0.2);
+        osc.frequency.setValueAtTime(800, t + 0.3);
+        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.linearRampToValueAtTime(0, t + 0.5);
+        osc.start(t);
+        osc.stop(t + 0.5);
+      } else if (type === 'levelup') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, t);
+        osc.frequency.setValueAtTime(554.37, t + 0.15); // C#
+        osc.frequency.setValueAtTime(659.25, t + 0.3); // E
+        osc.frequency.setValueAtTime(880, t + 0.45); // A
+        gain.gain.setValueAtTime(0.15, t);
+        gain.gain.linearRampToValueAtTime(0, t + 0.8);
+        osc.start(t);
+        osc.stop(t + 0.8);
+      }
+    }
+  };
+
+  document.addEventListener('click', function _initAudio(e) {
+    if (DZPlayer.data.prefs.music) DZAudio.init();
+    document.removeEventListener('click', _initAudio);
+  }, { once: true });
+
+  // Play SFX on button clicks
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('button') || e.target.closest('.dz-btn') || e.target.closest('.dz-icon-btn') || e.target.closest('.dz-mode-card') || e.target.closest('.dz-swatch')) {
+      if (typeof DZAudio !== 'undefined') DZAudio.playSFX('click');
+    }
+  });
+
+  global.dzRegisterGameLoop = registerGameLoop;
+  global.dzUnregisterGameLoop = unregisterGameLoop;
+  global.dzStopAllGames = stopAllGames;
+  global.DZPlayer = DZPlayer;
+  global.DZAudio = DZAudio;
+
+  // --- GLOBAL CONFETTI VFX ---
+  global.dzFireConfetti = function() {
+    var count = 100;
+    var colors = ['#00e5ff', '#ff007f', '#ffd700', '#10b981', '#a855f7'];
+    var particles = [];
+    var canvas = document.createElement('canvas');
+    canvas.style.position = 'fixed';
+    canvas.style.inset = '0';
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.zIndex = '9999';
+    document.body.appendChild(canvas);
+    
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width = window.innerWidth;
+    var h = canvas.height = window.innerHeight;
+    
+    for (var i=0; i<count; i++) {
+      particles.push({
+        x: w / 2, y: h / 2,
+        vx: (Math.random() - 0.5) * (w > 600 ? 25 : 15),
+        vy: (Math.random() - 0.8) * (h > 600 ? 25 : 15),
+        size: Math.random() * 6 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rot: Math.random() * 360,
+        rotSpeed: (Math.random() - 0.5) * 10
+      });
+    }
+    
+    function render() {
+      ctx.clearRect(0, 0, w, h);
+      var active = false;
+      particles.forEach(function(p) {
+        p.vy += 0.5; // gravity
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.rotSpeed;
+        if (p.y < h + 20) active = true;
+        
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot * Math.PI / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+        ctx.restore();
+      });
+      if (active) requestAnimationFrame(render);
+      else document.body.removeChild(canvas);
+    }
+    render();
+  };
+
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* DuelZone — shared game page helpers */
+(function (global) {
+  'use strict';
+
+  function initGamePage(opts) {
+    var options = opts || {};
+
+
+    var back = document.getElementById('dz-back-hub');
+    if (back && !back._dzWired) {
+      back._dzWired = true;
+      back.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (typeof dzStopAllGames === 'function') dzStopAllGames();
+        if (options.onLeave) options.onLeave();
+        if (typeof dzGoHub === 'function') dzGoHub();
+        else window.location.href = 'index.html';
+      });
+    }
+
+    var restart = document.getElementById('dz-restart');
+    if (restart && options.onRestart && !restart._dzWired) {
+      restart._dzWired = true;
+      restart.addEventListener('click', options.onRestart);
+    }
+  }
+
+  function wireResultButtons(opts) {
+    var overlay = document.getElementById('dz-result-overlay');
+    if (!overlay) return;
+
+    var again = document.getElementById('dz-result-again');
+    if (again && opts.onAgain) {
+      again.onclick = function () {
+        overlay.classList.remove('show');
+        opts.onAgain();
+      };
+    }
+
+    var share = document.getElementById('dz-result-share');
+    if (share) {
+      share.onclick = function () {
+        if (typeof dzShareWin === 'function') {
+          dzShareWin({
+            title: opts.title,
+            subtitle: opts.subtitle,
+            stats: opts.stats
+          });
+        }
+      };
+    }
+  }
+
+  function showResult(opts) {
+    var overlay = document.getElementById('dz-result-overlay');
+    if (!overlay) return;
+    overlay.classList.add('show');
+    var title = document.getElementById('dz-result-title');
+    var sub = document.getElementById('dz-result-sub');
+    if (title) title.textContent = opts.title || 'Victory!';
+    
+    var statsCard = document.getElementById('dz-result-stats');
+    if (statsCard && opts.stats) {
+      statsCard.style.display = 'grid';
+      var timeEl = document.getElementById('dz-stat-time');
+      var accEl = document.getElementById('dz-stat-acc');
+      var xpEl = document.getElementById('dz-stat-xp');
+      if (timeEl) timeEl.textContent = opts.stats.time || '00:00';
+      if (accEl) accEl.textContent = opts.stats.accuracy || '100%';
+      if (xpEl) xpEl.textContent = opts.stats.xp || '+50';
+    } else if (statsCard) {
+      statsCard.style.display = 'none';
+    }
+
+    // Award XP and update subtitle in one pass
+    if (typeof DZPlayer !== 'undefined') {
+      var xpEarned = 50;
+      var isWin = opts.title && opts.title.toLowerCase().indexOf('win') >= 0;
+      if (isWin) {
+        xpEarned = 100;
+        if (typeof DZAudio !== 'undefined') DZAudio.playSFX('win');
+        if (typeof dzFireConfetti === 'function') dzFireConfetti();
+      }
+      DZPlayer.addMatch(isWin);
+      DZPlayer.addXP(xpEarned);
+      if (sub) {
+        sub.innerHTML = (opts.subtitle || '') + '<br><span style="color:var(--dz-cyan);font-weight:bold;margin-top:8px;display:inline-block;"> | +' + xpEarned + ' XP Earned!</span>';
+      }
+    } else {
+      if (sub) sub.textContent = opts.subtitle || '';
+    }
+
+    wireResultButtons(opts);
+  }
+
+  function hideResult() {
+    var overlay = document.getElementById('dz-result-overlay');
+    if (overlay) overlay.classList.remove('show');
+  }
+
+  global.dzInitGamePage = initGamePage;
+  global.dzShowResult = showResult;
+  global.dzHideResult = hideResult;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+(function () {
+  'use strict';
+
+  var COLS = 7, ROWS = 6;
+
+  function init(opts) {
+    opts = opts || {};
+    var container = opts.container || document.body;
+    if (!container) return { stop: function () {} };
+    var vsBot = opts.vsBot !== false;
+    var sound = opts.sound !== false;
+    var board = [], currentPlayer = 1, gameOver = false;
+
+    container.innerHTML = '';
+
+    var style = document.createElement('style');
+    style.textContent = [
+      '.c4-wrap{display:flex;flex-direction:column;align-items:center;width:100%;max-width:400px;margin:0 auto;user-select:none;font-family:"Plus Jakarta Sans",sans-serif;}',
+      '.c4-hud{display:flex;justify-content:space-between;align-items:center;width:100%;padding:8px 12px;background:#0f172a;border:1px solid rgba(255,255,255,0.06);border-radius:10px;margin-bottom:8px;}',
+      '.c4-turn{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:rgba(255,255,255,0.8);}',
+      '.c4-disc-indicator{width:18px;height:18px;border-radius:50%;box-shadow:0 0 10px currentColor;}',
+      '.c4-board-wrap{background:#1e3a5f;border-radius:14px;padding:8px;box-shadow:0 8px 30px rgba(0,0,0,0.6),inset 0 2px 4px rgba(255,255,255,0.06);}',
+      '.c4-preview-row{display:grid;gap:5px;margin-bottom:4px;height:32px;}',
+      '.c4-preview-cell{border-radius:50%;transition:background 0.15s;}',
+      '.c4-grid{display:grid;gap:5px;}',
+      '.c4-cell{aspect-ratio:1;border-radius:50%;background:#060c18;box-shadow:inset 0 3px 8px rgba(0,0,0,0.8);position:relative;overflow:hidden;transition:all 0.1s;cursor:pointer;}',
+      '.c4-cell.p1{background:radial-gradient(circle at 35% 30%,#f9a8d4,#ec4899);box-shadow:0 0 14px rgba(236,72,153,0.6);}',
+      '.c4-cell.p2{background:radial-gradient(circle at 35% 30%,#fde68a,#f59e0b);box-shadow:0 0 14px rgba(245,158,11,0.6);}',
+      '.c4-cell.p1.disc-drop,.c4-cell.p2.disc-drop{animation:c4drop 0.3s ease-in;}',
+      '@keyframes c4drop{0%{transform:translateY(-200%);opacity:0.5}100%{transform:translateY(0);opacity:1}}',
+      '.c4-cell.win-cell{animation:c4win 0.5s ease infinite alternate;}',
+      '@keyframes c4win{0%{box-shadow:0 0 10px currentColor}100%{box-shadow:0 0 28px currentColor,0 0 50px currentColor}}',
+      '.c4-col-hover:hover .c4-cell:not(.p1):not(.p2){background:rgba(255,255,255,0.06);}',
+    ].join('');
+    document.head.appendChild(style);
+
+    for (var r = 0; r < ROWS; r++) {
+      board[r] = [];
+      for (var c = 0; c < COLS; c++) board[r][c] = 0;
+    }
+
+    var wrap = document.createElement('div');
+    wrap.className = 'c4-wrap';
+
+    var hud = document.createElement('div');
+    hud.className = 'c4-hud';
+    hud.innerHTML =
+      '<div class="c4-turn" id="c4-turn-display">' +
+        '<div class="c4-disc-indicator" id="c4-disc-ind" style="background:#ec4899;color:#ec4899"></div>' +
+        '<span id="c4-turn-text">Your turn</span>' +
+      '</div>' +
+      '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.3);">' + (vsBot ? 'vs Bot' : '2 Player') + '</div>';
+    wrap.appendChild(hud);
+
+    var boardWrap = document.createElement('div');
+    boardWrap.className = 'c4-board-wrap';
+
+    // Preview row
+    var previewRow = document.createElement('div');
+    previewRow.className = 'c4-preview-row';
+    previewRow.style.gridTemplateColumns = 'repeat(' + COLS + ',1fr)';
+    var previewCells = [];
+    for (var pc = 0; pc < COLS; pc++) {
+      var pcell = document.createElement('div');
+      pcell.className = 'c4-preview-cell';
+      previewRow.appendChild(pcell);
+      previewCells.push(pcell);
+    }
+    boardWrap.appendChild(previewRow);
+
+    // Grid
+    var grid = document.createElement('div');
+    grid.className = 'c4-grid';
+    grid.style.gridTemplateColumns = 'repeat(' + COLS + ',1fr)';
+    var cellEls = [];
+    for (var r = 0; r < ROWS; r++) {
+      cellEls[r] = [];
+      for (var c = 0; c < COLS; c++) {
+        (function(col) {
+          var cell = document.createElement('div');
+          cell.className = 'c4-cell';
+          cell.style.width = Math.floor(280 / COLS) + 'px';
+          cell.style.height = Math.floor(280 / COLS) + 'px';
+          cell.addEventListener('click', function() { dropDisc(col); });
+          cell.addEventListener('mouseenter', function() { showPreview(col); });
+          cell.addEventListener('mouseleave', function() { hidePreview(); });
+          cell.addEventListener('touchstart', function(e) { e.preventDefault(); showPreview(col); }, { passive: false });
+          cell.addEventListener('touchend', function(e) { e.preventDefault(); dropDisc(col); hidePreview(); }, { passive: false });
+          cellEls[r][col] = cell;
+          grid.appendChild(cell);
+        })(c);
+      }
+    }
+    boardWrap.appendChild(grid);
+    wrap.appendChild(boardWrap);
+    container.appendChild(wrap);
+
+    var audioCtx = null;
+    function beep(freq, dur, type) {
+      if (!sound) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = type || 'sine'; o.frequency.value = freq;
+        g.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(); o.stop(audioCtx.currentTime + dur);
+      } catch(e) {}
+    }
+
+    function showPreview(col) {
+      if (gameOver) return;
+      var color = currentPlayer === 1 ? '#ec4899' : '#f59e0b';
+      previewCells.forEach(function(pc, i) {
+        pc.style.background = i === col ? color : 'transparent';
+        pc.style.boxShadow = i === col ? ('0 0 10px ' + color) : 'none';
+      });
+    }
+    function hidePreview() {
+      previewCells.forEach(function(pc) { pc.style.background='transparent'; pc.style.boxShadow='none'; });
+    }
+
+    function getAvailRow(col) {
+      for (var r = ROWS-1; r >= 0; r--) if (board[r][col] === 0) return r;
+      return -1;
+    }
+
+    function checkWin(r, c, player) {
+      var dirs = [[0,1],[1,0],[1,1],[1,-1]];
+      for (var di = 0; di < dirs.length; di++) {
+        var dr = dirs[di][0], dc = dirs[di][1];
+        var count = 1, cells = [[r,c]];
+        for (var s = 1; s <= 3; s++) {
+          var nr = r+dr*s, nc = c+dc*s;
+          if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&board[nr][nc]===player) { count++; cells.push([nr,nc]); } else break;
+        }
+        for (var s = 1; s <= 3; s++) {
+          var nr2 = r-dr*s, nc2 = c-dc*s;
+          if (nr2>=0&&nr2<ROWS&&nc2>=0&&nc2<COLS&&board[nr2][nc2]===player) { count++; cells.push([nr2,nc2]); } else break;
+        }
+        if (count >= 4) return cells;
+      }
+      return null;
+    }
+
+    function updateTurnHUD() {
+      var isP1 = currentPlayer === 1;
+      var color = isP1 ? '#ec4899' : '#f59e0b';
+      var ind = document.getElementById('c4-disc-ind');
+      var txt = document.getElementById('c4-turn-text');
+      if (ind) { ind.style.background = color; ind.style.color = color; }
+      if (txt) txt.textContent = isP1 ? 'Your turn' : (vsBot ? 'Bot thinking...' : 'P2 turn');
+    }
+
+    function dropDisc(col) {
+      if (gameOver || (vsBot && currentPlayer === 2)) return;
+      var row = getAvailRow(col);
+      if (row < 0) return;
+      board[row][col] = currentPlayer;
+      var cell = cellEls[row][col];
+      cell.classList.add('p' + currentPlayer, 'disc-drop');
+      setTimeout(function() { cell.classList.remove('disc-drop'); }, 300);
+      beep(currentPlayer === 1 ? 440 : 360, 0.06);
+      hidePreview();
+      var winCells = checkWin(row, col, currentPlayer);
+      if (winCells) {
+        gameOver = true;
+        winCells.forEach(function(wc) {
+          cellEls[wc[0]][wc[1]].classList.add('win-cell');
+        });
+        var winner = currentPlayer === 1 ? 'Player 1' : (vsBot ? 'Bot' : 'Player 2');
+        beep(660, 0.5, 'triangle');
+        setTimeout(function() {
+          if (opts.onEnd) opts.onEnd({ winner: winner + ' Wins!', subtitle: '4 in a row!' });
+        }, 800);
+        return;
+      }
+      // Draw check
+      var isDraw = board[0].every(function(v) { return v !== 0; });
+      if (isDraw) {
+        gameOver = true;
+        setTimeout(function() {
+          if (opts.onEnd) opts.onEnd({ winner: 'Draw!', subtitle: 'Board is full' });
+        }, 500);
+        return;
+      }
+      currentPlayer = currentPlayer === 1 ? 2 : 1;
+      updateTurnHUD();
+      if (vsBot && currentPlayer === 2) {
+        setTimeout(botMove, 500);
+      }
+    }
+
+    function botMove() {
+      if (gameOver) return;
+      // Try to win or block
+      var bestCol = -1;
+      // Check if bot can win
+      for (var c = 0; c < COLS; c++) {
+        var r = getAvailRow(c);
+        if (r < 0) continue;
+        board[r][c] = 2;
+        if (checkWin(r, c, 2)) { board[r][c] = 0; bestCol = c; break; }
+        board[r][c] = 0;
+      }
+      // Block player win
+      if (bestCol < 0) {
+        for (var c = 0; c < COLS; c++) {
+          var r = getAvailRow(c);
+          if (r < 0) continue;
+          board[r][c] = 1;
+          if (checkWin(r, c, 1)) { board[r][c] = 0; bestCol = c; break; }
+          board[r][c] = 0;
+        }
+      }
+      // Prefer center
+      if (bestCol < 0) {
+        var pref = [3, 2, 4, 1, 5, 0, 6];
+        for (var i = 0; i < pref.length; i++) {
+          if (getAvailRow(pref[i]) >= 0) { bestCol = pref[i]; break; }
+        }
+      }
+      if (bestCol >= 0) dropDisc(bestCol);
+    }
+
+    updateTurnHUD();
+    return { stop: function() { gameOver = true; } };
+  }
+
+  if (!window.DZGames) window.DZGames = {};
+  window.DZGames['connect4'] = init;
+})();
+</script>
+<script>
+(function (global) {
+  'use strict';
+
+  // Preload QRious
+  function loadQRious(cb) {
+    if (global.QRious) { if (cb) cb(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
+    s.onload = function() { if (cb) cb(); };
+    s.onerror = function() { if (cb) cb(); };
+    document.head.appendChild(s);
+  }
+  loadQRious();
+
+  function _safe(text) {
+    if (!text) return '';
+    return String(text).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '');
+  }
+
+  function _hex2rgba(hex, alpha) {
+    var h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    var r = parseInt(h.slice(0, 2), 16);
+    var g = parseInt(h.slice(2, 4), 16);
+    var b = parseInt(h.slice(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
+
+  function drawRoundedRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawGlitchText(ctx, text, x, y, size) {
+    ctx.font = '900 ' + size + 'px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Cyan offset
+    ctx.fillStyle = '#00e5ff';
+    ctx.fillText(text, x - 4, y - 3);
+    // Magenta offset
+    ctx.fillStyle = '#f43f5e';
+    ctx.fillText(text, x + 4, y + 3);
+    // White top
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, x, y);
+  }
+
+  function createShareCard(options) {
+    var opts = options || {};
+    var w = 540;
+    var h = 960; // Vertical format matching user screenshot
+    var canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    var ctx = canvas.getContext('2d');
+
+    // Deep Black background
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(0, 0, w, h);
+
+    // Floating colorful squares with gradients (retro aesthetic)
+    var squares = [
+      { x: 80, y: 150, size: 80, r: -15, color1: '#f97316', color2: '#fbbf24' },
+      { x: 420, y: 220, size: 70, r: 10, color1: '#a855f7', color2: '#ec4899' },
+      { x: 120, y: 820, size: 80, r: -20, color1: '#3b82f6', color2: '#00e5ff' },
+      { x: 450, y: 780, size: 65, r: 25, color1: '#ec4899', color2: '#f43f5e' },
+      { x: 90, y: 550, size: 55, r: 5, color1: '#10b981', color2: '#34d399' },
+      { x: 480, y: 480, size: 75, r: -12, color1: '#8b5cf6', color2: '#6366f1' }
+    ];
+
+    squares.forEach(function(sq) {
+      ctx.save();
+      ctx.translate(sq.x, sq.y);
+      ctx.rotate(sq.r * Math.PI / 180);
+      var grad = ctx.createLinearGradient(0, 0, sq.size, sq.size);
+      grad.addColorStop(0, sq.color1);
+      grad.addColorStop(1, sq.color2);
+      ctx.fillStyle = grad;
+      drawRoundedRect(ctx, -sq.size/2, -sq.size/2, sq.size, sq.size, 20);
+      ctx.restore();
+    });
+
+    // Top Right: Player info (Avatar, Name, Level)
+    if (typeof window !== 'undefined' && window.DZPlayer) {
+      var pName = (window.DZPlayer.data && window.DZPlayer.data.name) || 'Player';
+      var pLevel = 'Lv.' + ((window.DZPlayer.data && window.DZPlayer.data.level) || 1);
+      var avatar = (window.DZPlayer.data && window.DZPlayer.data.avatar) || '👽';
+      
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      
+      // Avatar
+      ctx.font = '36px sans-serif';
+      ctx.fillText(avatar, w - 30, 40);
+
+      // Name
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 24px Plus Jakarta Sans, sans-serif';
+      ctx.fillText(_safe(pName), w - 85, 35);
+      
+      // Level
+      ctx.fillStyle = '#00e5ff';
+      ctx.font = 'bold 16px Plus Jakarta Sans, sans-serif';
+      ctx.fillText(_safe(pLevel), w - 85, 65);
+    }
+
+    // Main Text (Glitch Retro Style)
+    drawGlitchText(ctx, "DUELZONE", w/2, 280, 75);
+    drawGlitchText(ctx, _safe((opts.title || "VICTORY").toUpperCase()), w/2, 400, 52);
+
+    if (opts.stats) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 42px Plus Jakarta Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(_safe(opts.stats), w/2, 510);
+    }
+
+    // QR Code (Directly drawn from QRious canvas synchronously)
+    if (typeof QRious !== 'undefined') {
+      try {
+        var gameUrl = window.location.href;
+        var qr = new QRious({
+          value: gameUrl,
+          size: 160,
+          background: '#ffffff',
+          foreground: '#050505',
+          level: 'M'
+        });
+        
+        ctx.fillStyle = '#ffffff';
+        drawRoundedRect(ctx, w/2 - 95, 610, 190, 190, 16);
+        
+        // Draw the QR canvas directly onto the share canvas (100% synchronous)
+        ctx.drawImage(qr.canvas, w/2 - 80, 625, 160, 160);
+        
+        ctx.fillStyle = '#a1a1aa';
+        ctx.font = 'bold 16px Plus Jakarta Sans, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText("SCAN TO PLAY", w/2, 830);
+      } catch (err) {
+        console.warn('QR code generation error:', err);
+      }
+    }
+
+    return canvas;
+  }
+
+  function shareWin(options) {
+    loadQRious(function () {
+      var canvas = createShareCard(options);
+      var dataUrl = canvas.toDataURL('image/png');
+      if (navigator.share && options.tryNativeShare) {
+        canvas.toBlob(function (blob) {
+          if (!blob) return downloadDataUrl(dataUrl, 'duelzone-win.png');
+          var file = new File([blob], 'duelzone-win.png', { type: 'image/png' });
+          navigator.share({ files: [file], title: _safe(options.title || 'DuelZone Win') })
+            .catch(function () { downloadDataUrl(dataUrl, 'duelzone-win.png'); });
+        });
+      } else {
+        downloadDataUrl(dataUrl, 'duelzone-win.png');
+      }
+    });
+  }
+
+  function downloadDataUrl(dataUrl, filename) {
+    var a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    a.click();
+  }
+
+  global.dzShareSafe = _safe;
+  global.dzShareHex2Rgba = _hex2rgba;
+  global.dzCreateShareCard = createShareCard;
+  global.dzShareWin = shareWin;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+
+<script>
+(function() {
+  'use strict';
+  document.addEventListener('DOMContentLoaded', function() {
+    // Mode selector
+    document.querySelectorAll('.dz-mode-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        document.querySelectorAll('.dz-mode-card').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+      });
+    });
+    // Theme selector
+    document.querySelectorAll('.dz-swatch').forEach(function(card) {
+      card.addEventListener('click', function() {
+        document.querySelectorAll('.dz-swatch').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+      });
+    });
+
+    var setup = document.getElementById('c4-setup');
+    var play = document.getElementById('c4-play');
+    var area = document.getElementById('c4-game-area');
+    var instance = null;
+
+    document.getElementById('c4-start-btn').addEventListener('click', function() {
+      var modeCard = document.querySelector('.dz-mode-card.selected');
+      var vsBot = modeCard ? modeCard.dataset.mode === 'bot' : false;
+      var themeCard = document.querySelector('.dz-swatch.selected');
+      var theme = themeCard ? themeCard.dataset.theme : 'classic';
+      var sound = document.getElementById('c4-sound-toggle').checked;
+
+      setup.classList.add('hidden');
+      play.classList.remove('hidden');
+      if (instance && instance.stop) instance.stop();
+
+      setTimeout(function() {
+        try {
+          if (window.DZGames && window.DZGames['connect4']) {
+        instance = window.DZGames['connect4']({
+          container: area,
+          vsBot: vsBot,
+          theme: theme,
+          sound: sound,
+          onEnd: function(r) {
+            if (typeof dzShowResult === 'function') {
+              dzShowResult({
+                title: r.winner + ' Wins!',
+                subtitle: r.subtitle || 'Connect Four Victory',
+                onAgain: function() {
+                  if (typeof dzHideResult === 'function') dzHideResult();
+                  play.classList.add('hidden');
+                  setup.classList.remove('hidden');
+                }
+              });
+            }
+          }
+        });
+          } else {
+            area.innerHTML = '<div style="color:#ff4444; padding:20px; font-family:sans-serif; text-align:center;">Error: Game script not found or failed to load.</div>';
+          }
+        } catch (err) {
+          area.innerHTML = '<div style="color:#ff4444; padding:20px; font-family:sans-serif; text-align:center;">Error: ' + err.message + '</div>';
+        }
+      }, 60);
+    });
+
+    document.getElementById('dz-restart').addEventListener('click', function() {
+      if (instance && instance.stop) instance.stop();
+      if (typeof dzHideResult === 'function') dzHideResult();
+      play.classList.add('hidden');
+      setup.classList.remove('hidden');
+    });
+
+    if (typeof dzInitGamePage === 'function') dzInitGamePage({});
+  });
+})();
+</script>
+</body>
+</html>

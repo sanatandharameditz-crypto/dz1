@@ -1,0 +1,1092 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Word Duel · DuelZone</title>
+  <meta name="description" content="Play Word Duel on DuelZone — Race to type words faster than your opponent!" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="stylesheet" href="duelzone.css" />
+  <style>
+    .hidden { display: none !important; }
+
+    .dz-setup-page .dz-setup-wrap {
+      display: flex; flex-direction: column; gap: 14px;
+      width: 100%; max-width: 400px; margin: 0 auto; padding: 16px;
+      font-family: 'Plus Jakarta Sans', sans-serif; color: var(--dz-text-primary);
+    }
+    .dz-hero-heading {
+      font-size: 28px; font-weight: 800;
+      background: linear-gradient(135deg, #8b5cf6, #a78bfa, #c4b5fd);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .wd-section-title {
+      font-size: 11px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--dz-text-secondary);
+    }
+    .wd-diff-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .wd-diff-card {
+      background: var(--dz-bg-card); border: 2px solid var(--dz-border);
+      border-radius: var(--dz-radius-md); padding: 14px 8px;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      cursor: pointer; transition: all var(--dz-transition); text-align: center;
+    }
+    .wd-diff-card:hover { border-color: var(--dz-border-light); transform: translateY(-2px); }
+    .wd-diff-card.selected { border-color: #8b5cf6; box-shadow: 0 0 12px rgba(139,92,246,0.2); }
+    .wd-diff-emoji { font-size: 22px; }
+    .wd-diff-name { font-size: 13px; font-weight: 700; }
+
+    .dz-toggle-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-bottom: 8px; border-bottom: 1.5px solid var(--dz-border);
+    }
+    .dz-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .dz-toggle input { opacity: 0; width: 0; height: 0; }
+    .dz-toggle-track {
+      position: absolute; cursor: pointer; inset: 0;
+      background-color: var(--dz-border); transition: .3s; border-radius: 24px;
+    }
+    .dz-toggle-track:before {
+      position: absolute; content: ""; height: 16px; width: 16px;
+      left: 4px; bottom: 4px; background-color: white; transition: .3s; border-radius: 50%;
+    }
+    .dz-toggle input:checked + .dz-toggle-track { background-color: #8b5cf6; }
+    .dz-toggle input:checked + .dz-toggle-track:before { transform: translateX(20px); }
+
+    .wd-wrap {
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+      width: 100%; max-width: 400px; margin: 0 auto; padding: 16px; user-select: none;
+    }
+    .wd-hud {
+      display: flex; justify-content: space-between; align-items: center; width: 100%;
+      background: var(--dz-bg-card); border: 1px solid var(--dz-border);
+      padding: 10px 18px; border-radius: var(--dz-radius-md); font-weight: 800; font-size: 13px;
+    }
+    .wd-word-display {
+      font-size: 32px; font-weight: 800; letter-spacing: 4px; text-align: center;
+      padding: 24px 16px; background: var(--dz-bg-card); border: 2px solid var(--dz-border);
+      border-radius: var(--dz-radius-lg); width: 100%; min-height: 80px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .wd-typed { color: #22c55e; }
+    .wd-remaining { color: var(--dz-text-secondary); }
+    .wd-wrong { color: #ef4444; text-decoration: underline; }
+    .wd-input {
+      width: 100%; padding: 14px 18px; border-radius: var(--dz-radius-md);
+      border: 2px solid var(--dz-border); background: var(--dz-bg-card);
+      color: var(--dz-text-primary); font-size: 18px; font-weight: 600;
+      font-family: 'JetBrains Mono', monospace; outline: none; text-align: center;
+    }
+    .wd-input:focus { border-color: #8b5cf6; }
+    .wd-timer-bar {
+      width: 100%; height: 6px; background: var(--dz-border); border-radius: 3px; overflow: hidden;
+    }
+    .wd-timer-fill {
+      height: 100%; background: linear-gradient(90deg, #22c55e, #fbbf24, #ef4444);
+      transition: width 0.3s; border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+<div class="dz-app">
+  <header class="dz-topbar">
+    <a class="dz-icon-btn" id="dz-back-hub" href="index.html" aria-label="Back">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </a>
+    <span class="dz-logo" style="font-size:17px;">Word Duel</span>
+    <div class="dz-topbar-actions">
+      <button class="dz-icon-btn" id="dz-restart" type="button" aria-label="Restart">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.08-5"/></svg>
+      </button>
+      <button class="dz-theme-toggle" id="themeToggle" type="button">
+        <svg id="iconMoon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg id="iconSun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="wd-setup">
+    <div class="dz-setup-page dz-setup-wrap">
+      <p class="dz-hero-eyebrow">Word Duel</p>
+      <h2 class="dz-hero-heading">Speed Typing</h2>
+      <p style="color:var(--dz-text-secondary);font-size:13px;margin-bottom:12px;">Type each word as fast as you can! Race the clock.</p>
+
+      <div class="wd-section-title">Difficulty</div>
+      <div class="wd-diff-cards">
+        <div class="wd-diff-card" data-diff="easy">
+          <span class="wd-diff-emoji">🐢</span>
+          <span class="wd-diff-name">Easy</span>
+        </div>
+        <div class="wd-diff-card selected" data-diff="normal">
+          <span class="wd-diff-emoji">⚡</span>
+          <span class="wd-diff-name">Normal</span>
+        </div>
+        <div class="wd-diff-card" data-diff="hard">
+          <span class="wd-diff-emoji">🔥</span>
+          <span class="wd-diff-name">Expert</span>
+        </div>
+      </div>
+
+      <div class="wd-section-title" style="margin-top:16px;">Settings</div>
+      <div class="dz-toggle-row">
+        <span style="font-size:14px;font-weight:600">Audio FX</span>
+        <label class="dz-toggle">
+          <input type="checkbox" checked id="wd-sound-toggle">
+          <span class="dz-toggle-track"></span><span class="dz-toggle-thumb"></span>
+        </label>
+      </div>
+
+      <button class="dz-btn dz-btn-primary" id="wd-start-btn" type="button"
+              style="margin-top:20px;width:100%;border-radius:var(--dz-radius-xl);font-size:14px;font-weight:700;">
+        START TYPING 📝
+      </button>
+    </div>
+  </div>
+
+  <div id="wd-play" class="hidden">
+    <div id="wd-game-area"></div>
+  </div>
+</div>
+
+<div id="dz-result-overlay">
+  <div class="dz-result-page" style="max-width:320px;">
+    <div class="dz-result-trophy">📝</div>
+    <h2 class="dz-result-heading" id="dz-result-title">Results!</h2>
+    <p class="dz-result-subtitle" id="dz-result-sub"></p>
+    <div class="dz-result-actions">
+      <button class="dz-btn dz-btn-primary" id="dz-result-again" type="button">TRY AGAIN</button>
+      <button class="dz-btn dz-btn-secondary" id="dz-result-share" type="button">SHARE</button>
+    </div>
+    <a class="dz-see-all" href="index.html" style="margin-top:8px;display:block;">← Back to Hub</a>
+  </div>
+</div>
+
+<script>
+/* DuelZone — game registry. Every game must be registered or findGame() returns null. */
+(function (global) {
+  'use strict';
+
+
+  var GAMES = [
+    { id: 'chess', title: 'Chess', icon: '♟️', desc: 'Outsmart your rival', category: 'strategy', modes: 'pvp+bot', status: 'live', href: 'chess.html', plays: '14.2k', badge: 'hot' },
+    { id: 'ludo', title: 'Ludo', icon: '🎲', desc: 'Roll. Race. Win.', category: 'board', modes: 'pvp', status: 'live', href: 'ludo.html', plays: '9.8k', badge: 'new' },
+    { id: 'tetris', title: 'Tetris', icon: '🟦', desc: 'Stack to survive', category: 'arcade', modes: 'solo', status: 'live', href: 'tetris.html', plays: '6.4k' },
+    { id: 'battleship', title: 'Battleship', icon: '🚢', desc: 'Sink or be sunk', category: 'strategy', modes: 'pvp+bot', status: 'live', href: 'battleship.html', plays: '5.2k' },
+    { id: 'checkers', title: 'Checkers', icon: '⬛', desc: 'Jump and crown', category: 'strategy', modes: 'pvp+bot', status: 'live', href: 'checkers.html', plays: '4.8k' },
+    { id: 'carrom', title: 'Carrom', icon: '🎯', desc: 'Flick. Pocket. Score.', category: 'board', modes: 'pvp', status: 'soon', href: null, plays: 'Coming soon', badge: 'soon' },
+    { id: 'sudoku', title: 'Sudoku', icon: '🔢', desc: 'Fill the grid', category: 'puzzle', modes: 'solo', status: 'live', href: 'sudoku.html', plays: '4.1k' },
+    { id: 'minesweeper', title: 'Minesweeper', icon: '💣', desc: 'One wrong move...', category: 'puzzle', modes: 'solo', status: 'live', href: 'minesweeper.html', plays: '3.1k', badge: 'new' },
+    { id: 'airhockey', title: 'Air Hockey', icon: '🏒', desc: 'Slide and score', category: 'arcade', modes: 'pvp', status: 'live', href: 'airhockey.html', plays: '2.9k' },
+    { id: 'tanks', title: 'Tanks Arena', icon: '🛡️', desc: 'Blast your rival', category: 'arcade', modes: 'pvp', status: 'live', href: 'tanks.html', plays: '2.7k' },
+    { id: 'bomberman', title: 'Bomberman', icon: '💥', desc: 'Bomb battle', category: 'arcade', modes: 'pvp', status: 'live', href: 'bomberman.html', plays: '2.5k' },
+    { id: 'starcatcher', title: 'Star Catcher', icon: '⭐', desc: 'Catch falling stars', category: 'arcade', modes: 'solo', status: 'live', href: 'starcatcher.html', plays: '2.3k' },
+    { id: 'spacedodge', title: 'Space Dodge', icon: '🚀', desc: 'Dodge asteroids', category: 'arcade', modes: 'solo', status: 'live', href: 'spacedodge.html', plays: '2.1k' },
+    { id: 'territory', title: 'Territory', icon: '🗺️', desc: 'Claim the map', category: 'strategy', modes: 'pvp', status: 'live', href: 'territory.html', plays: '2.0k' },
+    { id: 'pingpong', title: 'Ping Pong', icon: '🏓', desc: 'Classic paddle duel', category: 'arcade', modes: 'pvp', status: 'live', href: 'pingpong.html', plays: '1.9k' },
+    { id: 'darts', title: 'Darts', icon: '🎯', desc: 'Hit the bullseye', category: 'arcade', modes: 'solo+pvp', status: 'live', href: 'darts.html', plays: '1.8k' },
+    { id: 'reaction', title: 'Reaction Test', icon: '⚡', desc: 'Tap when it turns green', category: 'casual', modes: 'solo', status: 'live', href: 'reaction.html', plays: '1.7k' },
+    { id: 'snake', title: 'Snake Duel', icon: '🐍', desc: 'Grow or crash', category: 'arcade', modes: 'pvp', status: 'live', href: 'snake.html', plays: '1.6k' },
+    { id: 'connect4', title: 'Connect Four', icon: '🔴', desc: 'Four in a row', category: 'board', modes: 'pvp', status: 'live', href: 'connect4.html', plays: '1.5k' },
+    { id: 'wordduel', title: 'Word Duel', icon: '📝', desc: 'Race to type', category: 'casual', modes: 'pvp', status: 'live', href: 'wordduel.html', plays: '1.4k' },
+    { id: 'pool', title: '8-Ball Pool', icon: '🎱', desc: 'Sink the eight', category: 'arcade', modes: 'pvp', status: 'live', href: 'pool.html', plays: '1.3k' },
+    { id: 'blackjack', title: 'Blackjack', icon: '🃏', desc: 'Beat the dealer', category: 'card', modes: 'solo', status: 'live', href: 'blackjack.html', plays: '1.2k' },
+    { id: 'memory', title: 'Memory Match', icon: '🧠', desc: 'Flip and remember', category: 'puzzle', modes: 'solo', status: 'live', href: 'memory.html', plays: '1.1k' },
+    { id: '2048', title: '2048 Duel', icon: '🔲', desc: 'Merge to win', category: 'puzzle', modes: 'pvp', status: 'live', href: 'game2048.html', plays: '1.0k' },
+    { id: 'pong', title: 'Pong Classic', icon: '🕹️', desc: 'Retro paddle war', category: 'arcade', modes: 'pvp', status: 'live', href: 'pong.html', plays: '980' }
+  ];
+
+  var FILTER_MAP = {
+    All: null,
+    Strategy: ['strategy'],
+    Board: ['board'],
+    Arcade: ['arcade'],
+    Puzzle: ['puzzle'],
+    Card: ['card'],
+    Casual: ['casual']
+  };
+
+  function findGame(id) {
+    if (!id) return null;
+    var key = String(id).toLowerCase();
+    for (var i = 0; i < GAMES.length; i++) {
+      if (GAMES[i].id === key) return GAMES[i];
+    }
+    return null;
+  }
+
+  function liveGames() {
+    return GAMES.filter(function (g) { return g.status === 'live'; });
+  }
+
+  function topRated() {
+    return liveGames().slice().sort(function (a, b) {
+      var pa = parseFloat(String(a.plays).replace(/[^\d.]/g, '')) || 0;
+      var pb = parseFloat(String(b.plays).replace(/[^\d.]/g, '')) || 0;
+      return pb - pa;
+    });
+  }
+
+  global.DZ_GAMES = GAMES;
+  global.DZ_FILTER_MAP = FILTER_MAP;
+  global.findGame = findGame;
+  global.dzLiveGames = liveGames;
+  global.dzTopRated = topRated;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* DuelZone — theme persistence via localStorage */
+(function (global) {
+  'use strict';
+
+  var STORAGE_KEY = 'dz-theme';
+
+  function getTheme() {
+    try {
+      return localStorage.getItem(STORAGE_KEY) || 'dark';
+    } catch (e) {
+      return 'dark';
+    }
+  }
+
+  function setTheme(theme) {
+    var t = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    try {
+      localStorage.setItem(STORAGE_KEY, t);
+    } catch (e) { /* private browsing */ }
+    syncToggleIcons(t);
+    return t;
+  }
+
+  function syncToggleIcons(theme) {
+    var moon = document.getElementById('iconMoon');
+    var sun = document.getElementById('iconSun');
+    if (!moon || !sun) return;
+    var isLight = theme === 'light';
+    moon.style.display = isLight ? 'block' : 'none';
+    sun.style.display = isLight ? 'none' : 'block';
+  }
+
+  function toggleTheme() {
+    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+    return setTheme(current === 'light' ? 'dark' : 'light');
+  }
+
+  function bindThemeToggle(btnId) {
+    var btn = document.getElementById(btnId || 'themeToggle');
+    if (!btn || btn._dzThemeWired) return;
+    btn._dzThemeWired = true;
+    btn.addEventListener('click', toggleTheme);
+  }
+
+  setTheme(getTheme());
+
+  global.dzGetTheme = getTheme;
+  global.dzSetTheme = setTheme;
+  global.dzToggleTheme = toggleTheme;
+  global.dzBindThemeToggle = bindThemeToggle;
+  global.dzSyncThemeIcons = function () { syncToggleIcons(getTheme()); };
+
+  document.addEventListener('DOMContentLoaded', function () {
+    syncToggleIcons(getTheme());
+    bindThemeToggle('themeToggle');
+  });
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* DuelZone — Core Logic, Player Profile, and Global Audio */
+(function (global) {
+  'use strict';
+
+  // --- GAME LIFECYCLE ---
+  var gameLoops = [];
+  function registerGameLoop(fn) { gameLoops.push(fn); }
+  function unregisterGameLoop(fn) { gameLoops = gameLoops.filter(function (f) { return f !== fn; }); }
+  function stopAllGames() {
+    gameLoops.forEach(function (fn) { try { fn(); } catch (e) {} });
+    gameLoops = [];
+  }
+
+  // --- PLAYER PROFILE & XP SYSTEM ---
+  var DZPlayer = {
+    data: {
+      name: "Player",
+      avatar: "👽",
+      xp: 0,
+      level: 1,
+      matches: 0,
+      wins: 0,
+      prefs: { music: false, sfx: true }
+    },
+    load: function() {
+      try {
+        var d = localStorage.getItem('dz_player_v1');
+        if (d) {
+          var parsed = JSON.parse(d);
+          for (var k in parsed) {
+            if (parsed.hasOwnProperty(k)) this.data[k] = parsed[k];
+          }
+        }
+      } catch(e) {}
+      this.recalcLevel();
+    },
+    save: function() {
+      try { localStorage.setItem('dz_player_v1', JSON.stringify(this.data)); } catch(e) {}
+    },
+    recalcLevel: function() {
+      this.data.level = Math.floor(Math.pow(this.data.xp / 100, 0.5)) + 1;
+    },
+    addXP: function(amount) {
+      var oldLevel = this.data.level;
+      this.data.xp += amount;
+      this.recalcLevel();
+      this.save();
+      if (this.data.level > oldLevel) {
+        if (typeof DZAudio !== 'undefined') DZAudio.playSFX('levelup');
+        if (typeof dzFireConfetti === 'function') dzFireConfetti();
+      }
+    },
+    addMatch: function(won) {
+      this.data.matches++;
+      if (won) this.data.wins++;
+      this.save();
+    },
+    setName: function(newName) {
+      if (newName && newName.trim().length > 0) {
+        this.data.name = newName.trim().substring(0, 15); // limit length
+        this.save();
+      }
+    },
+    xpForNextLevel: function() {
+      return Math.pow(this.data.level, 2) * 100;
+    },
+    xpForCurrentLevel: function() {
+      return Math.pow(this.data.level - 1, 2) * 100;
+    },
+    getProgressPercent: function() {
+      var currentFloor = this.xpForCurrentLevel();
+      var nextCeil = this.xpForNextLevel();
+      var range = nextCeil - currentFloor;
+      var into = this.data.xp - currentFloor;
+      return Math.min(100, Math.max(0, (into / range) * 100));
+    }
+  };
+  DZPlayer.load();
+
+  // --- GLOBAL AUDIO GENERATOR ---
+  var DZAudio = {
+    ctx: null,
+    bgmNodes: [],
+    initialized: false,
+    init: function() {
+      if (this.initialized) return;
+      if (!this.ctx) {
+        var AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) this.ctx = new AudioContext();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+      this.initialized = true;
+      if (DZPlayer.data.prefs.music) this.playBGM();
+    },
+    playBGM: function() {
+      this.stopBGM();
+      if (!DZPlayer.data.prefs.music || !this.ctx) return;
+      var t = this.ctx.currentTime;
+      
+      var osc1 = this.ctx.createOscillator();
+      var gain1 = this.ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.value = 110.00;
+      gain1.gain.setValueAtTime(0, t);
+      gain1.gain.linearRampToValueAtTime(0.04, t + 4);
+      osc1.connect(gain1); gain1.connect(this.ctx.destination);
+      osc1.start(t);
+      this.bgmNodes.push({o: osc1, g: gain1});
+      
+      var osc2 = this.ctx.createOscillator();
+      var gain2 = this.ctx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.value = 164.81;
+      gain2.gain.setValueAtTime(0, t);
+      gain2.gain.linearRampToValueAtTime(0.02, t + 6);
+      osc2.connect(gain2); gain2.connect(this.ctx.destination);
+      osc2.start(t);
+      this.bgmNodes.push({o: osc2, g: gain2});
+    },
+    stopBGM: function() {
+      var t = this.ctx ? this.ctx.currentTime : 0;
+      this.bgmNodes.forEach(function(n) {
+        try {
+          n.g.gain.linearRampToValueAtTime(0, t + 1);
+          setTimeout(function() { try { n.o.stop(); } catch(e){} }, 1100);
+        } catch(e) {}
+      });
+      this.bgmNodes = [];
+    },
+    toggleMusic: function(on) {
+      DZPlayer.data.prefs.music = on;
+      DZPlayer.save();
+      if (on) {
+        if (!this.initialized) this.init();
+        else this.playBGM();
+      } else {
+        this.stopBGM();
+      }
+    },
+    toggleSFX: function(on) {
+      DZPlayer.data.prefs.sfx = on;
+      DZPlayer.save();
+    },
+    isSFXEnabled: function() {
+      return DZPlayer.data.prefs.sfx;
+    },
+    playSFX: function(type) {
+      if (!this.isSFXEnabled() || !this.ctx) return;
+      var t = this.ctx.currentTime;
+      var osc = this.ctx.createOscillator();
+      var gain = this.ctx.createGain();
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      if (type === 'click') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, t);
+        osc.frequency.exponentialRampToValueAtTime(400, t + 0.05);
+        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+        osc.start(t);
+        osc.stop(t + 0.05);
+      } else if (type === 'win') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(400, t);
+        osc.frequency.setValueAtTime(500, t + 0.1);
+        osc.frequency.setValueAtTime(600, t + 0.2);
+        osc.frequency.setValueAtTime(800, t + 0.3);
+        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.linearRampToValueAtTime(0, t + 0.5);
+        osc.start(t);
+        osc.stop(t + 0.5);
+      } else if (type === 'levelup') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, t);
+        osc.frequency.setValueAtTime(554.37, t + 0.15); // C#
+        osc.frequency.setValueAtTime(659.25, t + 0.3); // E
+        osc.frequency.setValueAtTime(880, t + 0.45); // A
+        gain.gain.setValueAtTime(0.15, t);
+        gain.gain.linearRampToValueAtTime(0, t + 0.8);
+        osc.start(t);
+        osc.stop(t + 0.8);
+      }
+    }
+  };
+
+  document.addEventListener('click', function _initAudio(e) {
+    if (DZPlayer.data.prefs.music) DZAudio.init();
+    document.removeEventListener('click', _initAudio);
+  }, { once: true });
+
+  // Play SFX on button clicks
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('button') || e.target.closest('.dz-btn') || e.target.closest('.dz-icon-btn') || e.target.closest('.dz-mode-card') || e.target.closest('.dz-swatch')) {
+      if (typeof DZAudio !== 'undefined') DZAudio.playSFX('click');
+    }
+  });
+
+  global.dzRegisterGameLoop = registerGameLoop;
+  global.dzUnregisterGameLoop = unregisterGameLoop;
+  global.dzStopAllGames = stopAllGames;
+  global.DZPlayer = DZPlayer;
+  global.DZAudio = DZAudio;
+
+  // --- GLOBAL CONFETTI VFX ---
+  global.dzFireConfetti = function() {
+    var count = 100;
+    var colors = ['#00e5ff', '#ff007f', '#ffd700', '#10b981', '#a855f7'];
+    var particles = [];
+    var canvas = document.createElement('canvas');
+    canvas.style.position = 'fixed';
+    canvas.style.inset = '0';
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.zIndex = '9999';
+    document.body.appendChild(canvas);
+    
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width = window.innerWidth;
+    var h = canvas.height = window.innerHeight;
+    
+    for (var i=0; i<count; i++) {
+      particles.push({
+        x: w / 2, y: h / 2,
+        vx: (Math.random() - 0.5) * (w > 600 ? 25 : 15),
+        vy: (Math.random() - 0.8) * (h > 600 ? 25 : 15),
+        size: Math.random() * 6 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rot: Math.random() * 360,
+        rotSpeed: (Math.random() - 0.5) * 10
+      });
+    }
+    
+    function render() {
+      ctx.clearRect(0, 0, w, h);
+      var active = false;
+      particles.forEach(function(p) {
+        p.vy += 0.5; // gravity
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.rotSpeed;
+        if (p.y < h + 20) active = true;
+        
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot * Math.PI / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+        ctx.restore();
+      });
+      if (active) requestAnimationFrame(render);
+      else document.body.removeChild(canvas);
+    }
+    render();
+  };
+
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* DuelZone — shared game page helpers */
+(function (global) {
+  'use strict';
+
+  function initGamePage(opts) {
+    var options = opts || {};
+
+
+    var back = document.getElementById('dz-back-hub');
+    if (back && !back._dzWired) {
+      back._dzWired = true;
+      back.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (typeof dzStopAllGames === 'function') dzStopAllGames();
+        if (options.onLeave) options.onLeave();
+        if (typeof dzGoHub === 'function') dzGoHub();
+        else window.location.href = 'index.html';
+      });
+    }
+
+    var restart = document.getElementById('dz-restart');
+    if (restart && options.onRestart && !restart._dzWired) {
+      restart._dzWired = true;
+      restart.addEventListener('click', options.onRestart);
+    }
+  }
+
+  function wireResultButtons(opts) {
+    var overlay = document.getElementById('dz-result-overlay');
+    if (!overlay) return;
+
+    var again = document.getElementById('dz-result-again');
+    if (again && opts.onAgain) {
+      again.onclick = function () {
+        overlay.classList.remove('show');
+        opts.onAgain();
+      };
+    }
+
+    var share = document.getElementById('dz-result-share');
+    if (share) {
+      share.onclick = function () {
+        if (typeof dzShareWin === 'function') {
+          dzShareWin({
+            title: opts.title,
+            subtitle: opts.subtitle,
+            stats: opts.stats
+          });
+        }
+      };
+    }
+  }
+
+  function showResult(opts) {
+    var overlay = document.getElementById('dz-result-overlay');
+    if (!overlay) return;
+    overlay.classList.add('show');
+    var title = document.getElementById('dz-result-title');
+    var sub = document.getElementById('dz-result-sub');
+    if (title) title.textContent = opts.title || 'Victory!';
+    
+    var statsCard = document.getElementById('dz-result-stats');
+    if (statsCard && opts.stats) {
+      statsCard.style.display = 'grid';
+      var timeEl = document.getElementById('dz-stat-time');
+      var accEl = document.getElementById('dz-stat-acc');
+      var xpEl = document.getElementById('dz-stat-xp');
+      if (timeEl) timeEl.textContent = opts.stats.time || '00:00';
+      if (accEl) accEl.textContent = opts.stats.accuracy || '100%';
+      if (xpEl) xpEl.textContent = opts.stats.xp || '+50';
+    } else if (statsCard) {
+      statsCard.style.display = 'none';
+    }
+
+    // Award XP and update subtitle in one pass
+    if (typeof DZPlayer !== 'undefined') {
+      var xpEarned = 50;
+      var isWin = opts.title && opts.title.toLowerCase().indexOf('win') >= 0;
+      if (isWin) {
+        xpEarned = 100;
+        if (typeof DZAudio !== 'undefined') DZAudio.playSFX('win');
+        if (typeof dzFireConfetti === 'function') dzFireConfetti();
+      }
+      DZPlayer.addMatch(isWin);
+      DZPlayer.addXP(xpEarned);
+      if (sub) {
+        sub.innerHTML = (opts.subtitle || '') + '<br><span style="color:var(--dz-cyan);font-weight:bold;margin-top:8px;display:inline-block;"> | +' + xpEarned + ' XP Earned!</span>';
+      }
+    } else {
+      if (sub) sub.textContent = opts.subtitle || '';
+    }
+
+    wireResultButtons(opts);
+  }
+
+  function hideResult() {
+    var overlay = document.getElementById('dz-result-overlay');
+    if (overlay) overlay.classList.remove('show');
+  }
+
+  global.dzInitGamePage = initGamePage;
+  global.dzShowResult = showResult;
+  global.dzHideResult = hideResult;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+(function () {
+  'use strict';
+
+  var EASY_WORDS = ['cat', 'dog', 'run', 'sun', 'red', 'big', 'top', 'hat', 'cup', 'box', 'pen', 'map', 'fun', 'hot', 'net', 'sit', 'win', 'fly', 'key', 'ice'];
+  var NORMAL_WORDS = ['apple', 'brain', 'chess', 'dance', 'eagle', 'flame', 'ghost', 'honey', 'input', 'juice', 'knife', 'lemon', 'magic', 'night', 'ocean', 'piano', 'queen', 'robot', 'storm', 'tiger', 'unity', 'voice', 'water', 'xenon', 'yacht', 'zebra'];
+  var HARD_WORDS = ['algorithm', 'butterfly', 'challenge', 'dangerous', 'elaborate', 'frequency', 'gymnasium', 'hurricane', 'implement', 'juxtapose', 'knowledge', 'labyrinth', 'mechanism', 'negotiate', 'orchestra', 'pollution', 'quarterly', 'rectangle', 'structure', 'transport'];
+
+  var audioCtx = null;
+  function playSound(type, enabled) {
+    if (!enabled) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      var now = audioCtx.currentTime;
+
+      if (type === 'key') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600 + Math.random() * 200, now);
+        gain.gain.setValueAtTime(0.03, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+        osc.start(now); osc.stop(now + 0.03);
+      } else if (type === 'correct') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.setValueAtTime(1100, now + 0.06);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.start(now); osc.stop(now + 0.12);
+      } else if (type === 'wrong') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, now);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        osc.start(now); osc.stop(now + 0.1);
+      }
+    } catch (e) {}
+  }
+
+  function init(opts) {
+    opts = opts || {};
+    var container = opts.container;
+    if (!container) return { stop: function () {} };
+
+    var sound = opts.sound !== false;
+    var diff = opts.difficulty || 'normal';
+    var wordList = diff === 'easy' ? EASY_WORDS : diff === 'hard' ? HARD_WORDS : NORMAL_WORDS;
+    var GAME_TIME = diff === 'easy' ? 45 : diff === 'hard' ? 30 : 35;
+
+    container.innerHTML = '';
+    var wrap = document.createElement('div');
+    wrap.className = 'wd-wrap';
+
+    var hud = document.createElement('div');
+    hud.className = 'wd-hud';
+    hud.innerHTML = '<span>📝 Words: <span id="wd-count" style="color:#8b5cf6">0</span></span>' +
+                    '<span>⏱ <span id="wd-time" style="color:#fbbf24">' + GAME_TIME + 's</span></span>';
+    wrap.appendChild(hud);
+
+    var timerBar = document.createElement('div');
+    timerBar.className = 'wd-timer-bar';
+    timerBar.innerHTML = '<div class="wd-timer-fill" id="wd-fill" style="width:100%"></div>';
+    wrap.appendChild(timerBar);
+
+    var wordDisplay = document.createElement('div');
+    wordDisplay.className = 'wd-word-display';
+    wordDisplay.id = 'wd-word';
+    wrap.appendChild(wordDisplay);
+
+    var input = document.createElement('input');
+    input.className = 'wd-input';
+    input.type = 'text';
+    input.placeholder = 'Type here...';
+    input.autocomplete = 'off';
+    input.autocapitalize = 'off';
+    input.spellcheck = false;
+    input.id = 'wd-input';
+    wrap.appendChild(input);
+
+    container.appendChild(wrap);
+
+    var countEl = hud.querySelector('#wd-count');
+    var timeEl = hud.querySelector('#wd-time');
+    var fillEl = timerBar.querySelector('#wd-fill');
+
+    var running = true;
+    var wordsCompleted = 0, currentWord = '', startTime = Date.now();
+
+    function pickWord() {
+      currentWord = wordList[Math.floor(Math.random() * wordList.length)];
+      updateDisplay('');
+      input.value = '';
+    }
+
+    function updateDisplay(typed) {
+      var html = '';
+      for (var i = 0; i < currentWord.length; i++) {
+        if (i < typed.length) {
+          if (typed[i] === currentWord[i]) {
+            html += '<span class="wd-typed">' + currentWord[i] + '</span>';
+          } else {
+            html += '<span class="wd-wrong">' + currentWord[i] + '</span>';
+          }
+        } else {
+          html += '<span class="wd-remaining">' + currentWord[i] + '</span>';
+        }
+      }
+      wordDisplay.innerHTML = html;
+    }
+
+    input.addEventListener('input', function () {
+      if (!running) return;
+      var val = input.value.toLowerCase();
+      playSound('key', sound);
+      updateDisplay(val);
+
+      if (val === currentWord) {
+        wordsCompleted++;
+        countEl.textContent = wordsCompleted;
+        playSound('correct', sound);
+        pickWord();
+      } else if (val.length > 0 && val[val.length - 1] !== currentWord[val.length - 1]) {
+        playSound('wrong', sound);
+      }
+    });
+
+    var timerInterval = setInterval(function () {
+      if (!running) return;
+      var elapsed = (Date.now() - startTime) / 1000;
+      var remaining = Math.max(0, GAME_TIME - elapsed);
+      timeEl.textContent = Math.ceil(remaining) + 's';
+      fillEl.style.width = (remaining / GAME_TIME * 100) + '%';
+
+      if (remaining <= 0) {
+        running = false;
+        clearInterval(timerInterval);
+        input.disabled = true;
+        if (opts.onEnd) {
+          var wpm = Math.round(wordsCompleted / (GAME_TIME / 60));
+          opts.onEnd({
+            subtitle: 'Words Typed: ' + wordsCompleted + '  •  WPM: ' + wpm + '  •  Difficulty: ' + diff
+          });
+        }
+      }
+    }, 100);
+
+    pickWord();
+    setTimeout(function () { input.focus(); }, 100);
+
+    return {
+      stop: function () {
+        running = false;
+        clearInterval(timerInterval);
+      }
+    };
+  }
+
+  if (!window.DZGames) window.DZGames = {};
+  window.DZGames['wordduel'] = init;
+})();
+</script>
+<script>
+(function (global) {
+  'use strict';
+
+  // Preload QRious
+  function loadQRious(cb) {
+    if (global.QRious) { if (cb) cb(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
+    s.onload = function() { if (cb) cb(); };
+    s.onerror = function() { if (cb) cb(); };
+    document.head.appendChild(s);
+  }
+  loadQRious();
+
+  function _safe(text) {
+    if (!text) return '';
+    return String(text).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '');
+  }
+
+  function _hex2rgba(hex, alpha) {
+    var h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    var r = parseInt(h.slice(0, 2), 16);
+    var g = parseInt(h.slice(2, 4), 16);
+    var b = parseInt(h.slice(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
+
+  function drawRoundedRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawGlitchText(ctx, text, x, y, size) {
+    ctx.font = '900 ' + size + 'px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Cyan offset
+    ctx.fillStyle = '#00e5ff';
+    ctx.fillText(text, x - 4, y - 3);
+    // Magenta offset
+    ctx.fillStyle = '#f43f5e';
+    ctx.fillText(text, x + 4, y + 3);
+    // White top
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, x, y);
+  }
+
+  function createShareCard(options) {
+    var opts = options || {};
+    var w = 540;
+    var h = 960; // Vertical format matching user screenshot
+    var canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    var ctx = canvas.getContext('2d');
+
+    // Deep Black background
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(0, 0, w, h);
+
+    // Floating colorful squares with gradients (retro aesthetic)
+    var squares = [
+      { x: 80, y: 150, size: 80, r: -15, color1: '#f97316', color2: '#fbbf24' },
+      { x: 420, y: 220, size: 70, r: 10, color1: '#a855f7', color2: '#ec4899' },
+      { x: 120, y: 820, size: 80, r: -20, color1: '#3b82f6', color2: '#00e5ff' },
+      { x: 450, y: 780, size: 65, r: 25, color1: '#ec4899', color2: '#f43f5e' },
+      { x: 90, y: 550, size: 55, r: 5, color1: '#10b981', color2: '#34d399' },
+      { x: 480, y: 480, size: 75, r: -12, color1: '#8b5cf6', color2: '#6366f1' }
+    ];
+
+    squares.forEach(function(sq) {
+      ctx.save();
+      ctx.translate(sq.x, sq.y);
+      ctx.rotate(sq.r * Math.PI / 180);
+      var grad = ctx.createLinearGradient(0, 0, sq.size, sq.size);
+      grad.addColorStop(0, sq.color1);
+      grad.addColorStop(1, sq.color2);
+      ctx.fillStyle = grad;
+      drawRoundedRect(ctx, -sq.size/2, -sq.size/2, sq.size, sq.size, 20);
+      ctx.restore();
+    });
+
+    // Top Right: Player info (Avatar, Name, Level)
+    if (typeof window !== 'undefined' && window.DZPlayer) {
+      var pName = (window.DZPlayer.data && window.DZPlayer.data.name) || 'Player';
+      var pLevel = 'Lv.' + ((window.DZPlayer.data && window.DZPlayer.data.level) || 1);
+      var avatar = (window.DZPlayer.data && window.DZPlayer.data.avatar) || '👽';
+      
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      
+      // Avatar
+      ctx.font = '36px sans-serif';
+      ctx.fillText(avatar, w - 30, 40);
+
+      // Name
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 24px Plus Jakarta Sans, sans-serif';
+      ctx.fillText(_safe(pName), w - 85, 35);
+      
+      // Level
+      ctx.fillStyle = '#00e5ff';
+      ctx.font = 'bold 16px Plus Jakarta Sans, sans-serif';
+      ctx.fillText(_safe(pLevel), w - 85, 65);
+    }
+
+    // Main Text (Glitch Retro Style)
+    drawGlitchText(ctx, "DUELZONE", w/2, 280, 75);
+    drawGlitchText(ctx, _safe((opts.title || "VICTORY").toUpperCase()), w/2, 400, 52);
+
+    if (opts.stats) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 42px Plus Jakarta Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(_safe(opts.stats), w/2, 510);
+    }
+
+    // QR Code (Directly drawn from QRious canvas synchronously)
+    if (typeof QRious !== 'undefined') {
+      try {
+        var gameUrl = window.location.href;
+        var qr = new QRious({
+          value: gameUrl,
+          size: 160,
+          background: '#ffffff',
+          foreground: '#050505',
+          level: 'M'
+        });
+        
+        ctx.fillStyle = '#ffffff';
+        drawRoundedRect(ctx, w/2 - 95, 610, 190, 190, 16);
+        
+        // Draw the QR canvas directly onto the share canvas (100% synchronous)
+        ctx.drawImage(qr.canvas, w/2 - 80, 625, 160, 160);
+        
+        ctx.fillStyle = '#a1a1aa';
+        ctx.font = 'bold 16px Plus Jakarta Sans, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText("SCAN TO PLAY", w/2, 830);
+      } catch (err) {
+        console.warn('QR code generation error:', err);
+      }
+    }
+
+    return canvas;
+  }
+
+  function shareWin(options) {
+    loadQRious(function () {
+      var canvas = createShareCard(options);
+      var dataUrl = canvas.toDataURL('image/png');
+      if (navigator.share && options.tryNativeShare) {
+        canvas.toBlob(function (blob) {
+          if (!blob) return downloadDataUrl(dataUrl, 'duelzone-win.png');
+          var file = new File([blob], 'duelzone-win.png', { type: 'image/png' });
+          navigator.share({ files: [file], title: _safe(options.title || 'DuelZone Win') })
+            .catch(function () { downloadDataUrl(dataUrl, 'duelzone-win.png'); });
+        });
+      } else {
+        downloadDataUrl(dataUrl, 'duelzone-win.png');
+      }
+    });
+  }
+
+  function downloadDataUrl(dataUrl, filename) {
+    var a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    a.click();
+  }
+
+  global.dzShareSafe = _safe;
+  global.dzShareHex2Rgba = _hex2rgba;
+  global.dzCreateShareCard = createShareCard;
+  global.dzShareWin = shareWin;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+
+<script>
+(function() {
+  'use strict';
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.wd-diff-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        document.querySelectorAll('.wd-diff-card').forEach(function(c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+      });
+    });
+
+    var setup = document.getElementById('wd-setup');
+    var play = document.getElementById('wd-play');
+    var area = document.getElementById('wd-game-area');
+    var instance = null;
+
+    document.getElementById('wd-start-btn').addEventListener('click', function() {
+      var diffCard = document.querySelector('.wd-diff-card.selected');
+      var diff = diffCard ? diffCard.dataset.diff : 'normal';
+      var sound = document.getElementById('wd-sound-toggle').checked;
+
+      setup.classList.add('hidden');
+      play.classList.remove('hidden');
+      if (instance && instance.stop) instance.stop();
+
+      setTimeout(function() {
+        try {
+          if (window.DZGames && window.DZGames['wordduel']) {
+          instance = window.DZGames['wordduel']({
+            container: area,
+            difficulty: diff,
+            sound: sound,
+            onEnd: function(r) {
+              if (typeof dzShowResult === 'function') {
+                dzShowResult({
+                  title: 'Time\'s Up!',
+                  subtitle: r.subtitle || 'Word Duel Complete',
+                  onAgain: function() {
+                    if (typeof dzHideResult === 'function') dzHideResult();
+                    play.classList.add('hidden');
+                    setup.classList.remove('hidden');
+                  }
+                });
+              }
+            }
+          });
+          } else {
+            area.innerHTML = '<div style="color:#ff4444; padding:20px; font-family:sans-serif; text-align:center;">Error: Game script not found or failed to load.</div>';
+          }
+        } catch (err) {
+          area.innerHTML = '<div style="color:#ff4444; padding:20px; font-family:sans-serif; text-align:center;">Error: ' + err.message + '</div>';
+        }
+      }, 60);
+    });
+
+    document.getElementById('dz-restart').addEventListener('click', function() {
+      if (instance && instance.stop) instance.stop();
+      if (typeof dzHideResult === 'function') dzHideResult();
+      play.classList.add('hidden');
+      setup.classList.remove('hidden');
+    });
+
+    if (typeof dzInitGamePage === 'function') dzInitGamePage({});
+  });
+})();
+</script>
+</body>
+</html>
